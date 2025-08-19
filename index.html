@@ -2,27 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Futures Transaction Analyzer</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
+    /*
+     * A CSS file to define the look and feel of the Futures Transaction Analyzer.
+     * The theme is inspired by the Binance light mode with yellow and green accents.
+     */
+
+    /* --- Global Variables & General Styling --- */
     :root {
       --bg-color: #f5f5f5;
       --card-bg: #ffffff;
       --text-color: #333333;
       --primary-color: #fcd535;
       --secondary-color: #666666;
-      --accent-color: #00b578;
-      --warning-color: #ff4655;
+      --accent-positive: #00b578;
+      --accent-negative: #ff4655;
       --border-color: #e0e0e0;
-      --bar-color-fees: #ff4655;
-      --bar-color-pnl: #00b578;
-      --line-color-pnl: #00b578;
-      --line-color-fees: #f0b90b;
-      --scrollbar-thumb: #999;
-      --scrollbar-track: #e0e0e0;
+      --shadow-light: rgba(0, 0, 0, 0.08);
+      --scrollbar-thumb: #ccc;
+      --scrollbar-track: #f0f0f0;
     }
+
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       margin: 0;
@@ -32,6 +37,13 @@
       font-size: 14px;
       line-height: 1.6;
     }
+
+    h1, h2, h3, h4 {
+      color: var(--text-color);
+      margin: 0;
+      padding: 0;
+    }
+    
     h1 {
       margin-bottom: 20px;
       color: var(--primary-color);
@@ -39,12 +51,62 @@
       font-size: 2.2em;
       letter-spacing: 1px;
     }
+
+    h2 {
+      text-align: center;
+      margin-top: 30px;
+      margin-bottom: 15px;
+      color: var(--secondary-color);
+      font-size: 1.8em;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+
+    /* --- Container & Card Styling --- */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 4px 15px var(--shadow-light);
+      text-align: center;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .intro-text, .fee-description {
+      margin-bottom: 25px;
+      text-align: left;
+    }
+
+    .fee-description ul {
+      list-style-type: none;
+      padding: 0;
+    }
+
+    .fee-description li {
+      margin-bottom: 10px;
+      padding-left: 1.5em;
+      position: relative;
+    }
+
+    .fee-description li:before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: var(--primary-color);
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+
+    /* --- Input and Button Styling --- */
     input[type="file"] {
       display: none;
     }
+
     label.file-label {
       display: block;
-      margin: 20px auto 20px auto;
+      margin: 20px auto;
       padding: 12px 20px;
       border: 2px solid var(--primary-color);
       border-radius: 8px;
@@ -55,137 +117,22 @@
       color: var(--primary-color);
       text-align: center;
       transition: all 0.3s ease;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
     }
+
     label.file-label:hover {
       background-color: #fff4d6;
       border-color: #e6c831;
+      transform: translateY(-2px);
     }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-      background: var(--card-bg);
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-      text-align: center;
-    }
-    .intro-text, .fee-description {
-      margin-bottom: 25px;
-      text-align: left;
-    }
-    .fee-description ul {
-      list-style-type: none;
-      padding: 0;
-    }
-    .fee-description li {
-      margin-bottom: 10px;
-      padding-left: 1.5em;
-      position: relative;
-    }
-    .fee-description li:before {
-      content: '•';
-      position: absolute;
-      left: 0;
-      color: var(--primary-color);
-      font-weight: bold;
-    }
-    .fee-description h3 {
-      color: var(--secondary-color);
-      font-size: 1.2em;
-      margin-bottom: 8px;
-    }
-    .table-container {
-      overflow-x: auto;
-      margin-top: 20px;
-      border-radius: 8px;
-    }
-    table {
-      width: 100%;
-      min-width: 500px;
-      border-collapse: collapse;
-      background: var(--card-bg);
-      margin-bottom: 20px;
-    }
-    th, td {
-      border: 1px solid var(--border-color);
-      padding: 10px 15px;
-      text-align: right;
-      font-size: 0.95em;
-      white-space: nowrap;
-    }
-    th {
-      background: var(--primary-color);
-      color: #333333;
-      font-weight: 600;
-      text-align: center;
-      cursor: help;
-    }
-    thead th:first-child {
-      border-top-left-radius: 8px;
-    }
-    thead th:last-child {
-      border-top-right-radius: 8px;
-    }
-    tbody tr:last-child {
-      font-weight: bold;
-      background: #f0f0f0;
-      border-top: 2px solid var(--secondary-color);
-    }
-    .error {
-      color: var(--warning-color);
-      margin-top: 10px;
-      text-align: center;
-      font-weight: bold;
-    }
-    #progressContainer {
-      display: none;
-      width: 80%;
-      max-width: 400px;
-      margin: 15px auto;
-      background: #e0e0e0;
-      height: 20px;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
-    }
-    #progressBar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(to right, var(--accent-color), #00a06c);
-      transition: width 0.4s ease-out;
-      border-radius: 10px;
-      text-align: center;
-      color: white;
-      line-height: 20px;
-      font-size: 0.8em;
-    }
-    h2 {
-      text-align: center;
-      margin-top: 30px;
-      margin-bottom: 15px;
-      color: var(--secondary-color);
-      font-size: 1.8em;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 8px;
-    }
-    .chart-container {
-      width: 100%;
-      max-width: 700px;
-      margin: 40px auto;
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    }
-    #output-section {
-        display: none;
-    }
+    
     .wallet-input {
       display: flex;
       flex-direction: column;
       align-items: center;
       margin-bottom: 20px;
     }
+
     .wallet-input input {
       padding: 10px;
       border: 1px solid var(--border-color);
@@ -197,31 +144,153 @@
       margin-top: 10px;
       background: #f9f9f9;
       color: var(--text-color);
+      transition: all 0.2s ease;
     }
+
+    .wallet-input input:focus {
+      outline: none;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 3px rgba(252, 213, 53, 0.2);
+    }
+
+    /* --- Progress Bar and Error Messages --- */
+    #progressContainer {
+      display: none;
+      width: 80%;
+      max-width: 400px;
+      margin: 15px auto;
+      background: #e0e0e0;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    #progressBar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, var(--accent-positive), #00a06c);
+      transition: width 0.4s ease-out;
+      border-radius: 10px;
+      text-align: center;
+      color: white;
+      line-height: 20px;
+      font-size: 0.8em;
+    }
+
+    .error {
+      color: var(--accent-negative);
+      margin-top: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+    
+    /* --- Table Styling --- */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 20px;
+      border-radius: 8px;
+    }
+    
+    table {
+      width: 100%;
+      min-width: 500px;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+    
+    th, td {
+      border: 1px solid var(--border-color);
+      padding: 10px 15px;
+      text-align: right;
+      font-size: 0.95em;
+      white-space: nowrap;
+    }
+    
+    th {
+      background: var(--primary-color);
+      color: #333333;
+      font-weight: 600;
+      text-align: center;
+      cursor: help;
+    }
+
+    tbody tr {
+      transition: background-color 0.3s ease;
+    }
+
+    tbody tr:hover {
+      background-color: #fcf6d7;
+    }
+    
+    thead th:first-child { border-top-left-radius: 8px; }
+    thead th:last-child { border-top-right-radius: 8px; }
+    
+    tbody tr:last-child {
+      font-weight: bold;
+      background: #f0f0f0;
+      border-top: 2px solid var(--secondary-color);
+    }
+    
+    /* --- Chart Styling --- */
+    .chart-container {
+      width: 100%;
+      max-width: 700px;
+      margin: 40px auto;
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px var(--shadow-light);
+    }
+
     .pie-chart-container {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       gap: 20px;
+      margin-top: 20px;
     }
+
     .pie-chart-item {
         width: 100%;
         max-width: 250px;
+        background: var(--card-bg);
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px var(--shadow-light);
+        transition: transform 0.3s ease-in-out;
     }
+
+    .pie-chart-item:hover {
+        transform: translateY(-5px);
+    }
+
     .pie-chart-item canvas {
         cursor: pointer;
     }
+    
+    /* --- Scrollbar Styling for Webkit Browsers --- */
     ::-webkit-scrollbar {
         width: 10px;
         height: 10px;
     }
+    
     ::-webkit-scrollbar-thumb {
         background: var(--scrollbar-thumb);
         border-radius: 10px;
     }
+    
     ::-webkit-scrollbar-track {
         background: var(--scrollbar-track);
     }
+    
+    /* --- Visibility for output section --- */
+    #output-section {
+        display: none;
+    }
+    
   </style>
 </head>
 <body>
@@ -261,479 +330,530 @@
   </div>
 
   <script>
-    const fileInput = document.getElementById("fileInput");
-    const homepage = document.getElementById("homepage");
-    const outputSection = document.getElementById("output-section");
-    const errorDiv = document.getElementById("error");
-    const outputDiv = document.getElementById("output");
-    const progressContainer = document.getElementById("progressContainer");
-    const progressBar = document.getElementById("progressBar");
-    const initialBalanceInput = document.getElementById("initialBalance");
+    /**
+     * The main application class to handle file processing, data analysis, and UI rendering.
+     * This modular approach improves code organization and readability.
+     */
+    class App {
+      constructor() {
+        // Cache DOM elements for efficient access
+        this.fileInput = document.getElementById("fileInput");
+        this.homepage = document.getElementById("homepage");
+        this.outputSection = document.getElementById("output-section");
+        this.errorDiv = document.getElementById("error");
+        this.outputDiv = document.getElementById("output");
+        this.progressContainer = document.getElementById("progressContainer");
+        this.progressBar = document.getElementById("progressBar");
+        this.initialBalanceInput = document.getElementById("initialBalance");
 
-    fileInput.addEventListener("change", handleFile);
-
-    function updateProgress(percent) {
-      progressBar.style.width = percent + "%";
-      progressBar.textContent = `${Math.round(percent)}%`;
-    }
-
-    function handleFile(event) {
-      const file = event.target.files[0];
-      errorDiv.textContent = "";
-      outputDiv.innerHTML = "";
-
-      const initialBalance = parseFloat(initialBalanceInput.value);
-      if (isNaN(initialBalance)) {
-        errorDiv.textContent = "Please enter a valid initial balance.";
-        return;
+        // Bind event listeners to the class instance
+        this.fileInput.addEventListener("change", this.handleFile.bind(this));
+        
+        // Expose a public method for the pie charts to use
+        window.scrollToSymbol = this.scrollToSymbol.bind(this);
       }
 
-      homepage.style.display = 'none';
-      outputSection.style.display = 'block';
-      
-      const fileExtension = file.name.split('.').pop().toLowerCase();
-      if (fileExtension !== 'xlsx' && fileExtension !== 'csv') {
-          errorDiv.textContent = "Please upload a valid XLSX or CSV file.";
-          homepage.style.display = 'block';
-          outputSection.style.display = 'none';
+      /**
+       * Main handler for the file input change event.
+       * @param {Event} event The file input change event.
+       */
+      async handleFile(event) {
+        const file = event.target.files[0];
+        this.errorDiv.textContent = "";
+        this.outputDiv.innerHTML = "";
+
+        const initialBalance = parseFloat(this.initialBalanceInput.value);
+        if (isNaN(initialBalance)) {
+          this.errorDiv.textContent = "Please enter a valid initial balance.";
           return;
-      }
+        }
 
-      const reader = new FileReader();
+        this.homepage.style.display = 'none';
+        this.outputSection.style.display = 'block';
 
-      reader.onloadstart = () => {
-        progressContainer.style.display = "block";
-        updateProgress(0);
-      };
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        if (fileExtension !== 'xlsx' && fileExtension !== 'csv') {
+          this.errorDiv.textContent = "Please upload a valid XLSX or CSV file.";
+          this.homepage.style.display = 'block';
+          this.outputSection.style.display = 'none';
+          return;
+        }
 
-      reader.onload = function (e) {
         try {
-          updateProgress(50);
-          setTimeout(() => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: "array" });
-            const sheetName = workbook.SheetNames[0];
-            const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
+          this.showProgress(0);
+          const sheet = await this.readFileAsync(file);
 
-            if (sheet.length === 0) {
-              errorDiv.textContent = "No data found in sheet.";
-              progressContainer.style.display = "none";
-              homepage.style.display = 'block';
-              outputSection.style.display = 'none';
-              return;
-            }
+          if (sheet.length === 0) {
+            throw new Error("No data found in sheet.");
+          }
 
-            updateProgress(75);
+          this.showProgress(75);
+          const summary = this.processData(sheet, initialBalance);
+          this.renderOutput(summary);
 
-            const summary = {
-              perSymbol: {},
-              transfers: {
-                transferIn: 0,
-                transferOut: 0
-              },
-              timeseries: []
-            };
+          this.showProgress(100);
+          setTimeout(() => this.progressContainer.style.display = "none", 500);
 
-            const typeMap = {
-              'COMMISSION': 'tradingFees',
-              'REALIZED_PNL': 'profitAndLoss',
-              'FUNDING_FEE': 'fundingFees',
-              'LIQUIDATION_FEE': 'liquidation',
-              'TRANSFER': 'transfer',
-              'STRATEGY_UMFUTURES_TRANSFER': 'transfer',
-              'BFUSD_REWARD': 'tradingFees'
-            };
-
-            const sortedSheet = sheet.sort((a, b) => new Date(a['Date(UTC)']) - new Date(b['Date(UTC)']));
-            let cumulativePnL = 0;
-            let cumulativeFees = 0;
-            let cumulativeWalletBalance = initialBalance;
-
-            sortedSheet.forEach((row) => {
-              const normalizedRow = Object.fromEntries(
-                Object.entries(row).map(([k, v]) => [k.toString().trim().toUpperCase(), v])
-              );
-              
-              const symbol = normalizedRow["SYMBOL"] || "--";
-              const type = normalizedRow["TYPE"] || "UNKNOWN";
-              const amount = Number(normalizedRow["AMOUNT"] || 0);
-
-              if (!summary.perSymbol[symbol]) {
-                summary.perSymbol[symbol] = {
-                  tradingFees: 0,
-                  profitAndLoss: 0,
-                  fundingFees: 0,
-                  liquidation: 0,
-                };
-              }
-
-              const category = typeMap[type] || 'unknown';
-
-              if (category === 'transfer') {
-                if (amount > 0) {
-                  summary.transfers.transferIn += amount;
-                } else {
-                  summary.transfers.transferOut += amount;
-                }
-                cumulativeWalletBalance += amount;
-              } else if (category in summary.perSymbol[symbol]) {
-                summary.perSymbol[symbol][category] += amount;
-              } else if (category === 'tradingFees' && type === 'BFUSD_REWARD') {
-                 summary.perSymbol[symbol]['tradingFees'] += amount;
-              }
-
-              // Time series analysis
-              const fees = Math.abs(normalizedRow['TYPE'] === 'COMMISSION' ? amount : 0) +
-                           Math.abs(normalizedRow['TYPE'] === 'FUNDING_FEE' ? amount : 0) +
-                           Math.abs(normalizedRow['TYPE'] === 'LIQUIDATION_FEE' ? amount : 0);
-              const pnl = normalizedRow['TYPE'] === 'REALIZED_PNL' ? amount : 0;
-              
-              cumulativePnL += pnl;
-              cumulativeFees += fees;
-              
-              summary.timeseries.push({
-                date: new Date(normalizedRow['DATE(UTC)']),
-                pnl: cumulativePnL,
-                fees: cumulativeFees,
-                walletBalance: initialBalance + cumulativePnL + cumulativeFees
-              });
-            });
-
-            updateProgress(90);
-
-            let htmlOutput = '';
-            let grandTotals = { tradingFees: 0, profitAndLoss: 0, fundingFees: 0, liquidation: 0 };
-            
-            for (const symbol in summary.perSymbol) {
-                grandTotals.tradingFees += summary.perSymbol[symbol].tradingFees;
-                grandTotals.profitAndLoss += summary.perSymbol[symbol].profitAndLoss;
-                grandTotals.fundingFees += summary.perSymbol[symbol].fundingFees;
-                grandTotals.liquidation += summary.perSymbol[symbol].liquidation;
-            }
-
-            const totalFees = Math.abs(grandTotals.tradingFees) + Math.abs(grandTotals.fundingFees) + Math.abs(grandTotals.liquidation);
-            const totalPnL = grandTotals.profitAndLoss;
-            
-            // --- Total Fees vs P&L Chart ---
-            htmlOutput += '<h2>Total Fees vs. Profit & Loss</h2>';
-            htmlOutput += `<div class="chart-container"><canvas id="barChart"></canvas></div>`;
-
-            // --- P&L Growth and Fees Analysis ---
-            htmlOutput += '<h2>PnL Growth & Fees Analysis</h2>';
-            htmlOutput += `<div class="chart-container"><canvas id="lineChart"></canvas></div>`;
-
-            // --- Wallet Balance Growth Analysis ---
-            htmlOutput += '<h2>Wallet Balance Growth</h2>';
-            htmlOutput += `<div class="chart-container"><canvas id="walletChart"></canvas></div>`;
-
-            // --- Main Summary Table ---
-            htmlOutput += '<h2>Summary per Symbol</h2>';
-            htmlOutput += `<div class="table-container"><table>
-                        <thead>
-                          <tr>
-                            <th title="The trading pair or contract symbol (e.g., BTCUSDT).">Symbol</th>
-                            <th title="Trading fees are based on trade size. They are a cost (negative value) for market takers (0.05%) and can be a rebate (positive value) for market makers (0.02%).">Trading Fees</th>
-                            <th title="Realized Profit and Loss (PnL) from closed positions.">Profit & Loss</th>
-                            <th title="Funding fees are periodic payments exchanged between long and short traders to keep the contract price in line with the underlying asset price. They can be positive or negative.">Funding Fees</th>
-                            <th title="Fees incurred from the liquidation of a position.">Liquidation</th>
-                          </tr>
-                        </thead>
-                        <tbody>`;
-            
-            for (const symbol in summary.perSymbol) {
-              const values = summary.perSymbol[symbol];
-              htmlOutput += `<tr id="symbol-row-${symbol}">
-                                <td>${symbol}</td>
-                                <td>${values.tradingFees.toFixed(2)}</td>
-                                <td>${values.profitAndLoss.toFixed(2)}</td>
-                                <td>${values.fundingFees.toFixed(2)}</td>
-                                <td>${values.liquidation.toFixed(2)}</td>
-                              </tr>`;
-            }
-
-            htmlOutput += `<tr style="font-weight:bold;background:#f0f0f0;">
-                            <td>Grand Total</td>
-                            <td>${grandTotals.tradingFees.toFixed(2)}</td>
-                            <td>${grandTotals.profitAndLoss.toFixed(2)}</td>
-                            <td>${grandTotals.fundingFees.toFixed(2)}</td>
-                            <td>${grandTotals.liquidation.toFixed(2)}</td>
-                          </tr>`;
-            htmlOutput += `</tbody></table></div>`;
-            
-            // --- Individual Symbol Pie Charts ---
-            htmlOutput += '<h2>Fees vs. PnL per Symbol</h2>';
-            htmlOutput += `<div class="pie-chart-container" id="pie-charts"></div>`;
-
-            // --- Separate Transfer Tables ---
-            htmlOutput += '<h2>Transfer Summary</h2>';
-            htmlOutput += `<div class="table-container"><table>
-                        <thead>
-                          <tr>
-                            <th title="Total amount of assets transferred into your account.">Transfer In (Positive)</th>
-                            <th title="Total amount of assets transferred out of your account.">Transfer Out (Negative)</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td>${summary.transfers.transferIn.toFixed(2)}</td>
-                            <td>${summary.transfers.transferOut.toFixed(2)}</td>
-                          </tr>
-                        </tbody>
-                        </table></div>`;
-
-            outputDiv.innerHTML = htmlOutput;
-
-            // Render Bar Chart (Total Fees vs P&L)
-            const ctxBar = document.getElementById('barChart').getContext('2d');
-            new Chart(ctxBar, {
-                type: 'bar',
-                data: {
-                    labels: ['Total Fees', 'Total P&L'],
-                    datasets: [{
-                        label: 'Amount (USDT)',
-                        data: [totalFees, totalPnL],
-                        backgroundColor: [
-                          '#5bc0de',
-                          '#5cb85c'
-                        ],
-                        borderColor: [
-                          '#46a6c7',
-                          '#46a646'
-                        ],
-                        borderWidth: 1,
-                        borderRadius: 5,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { color: 'var(--secondary-color)' }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: 'var(--secondary-color)' }
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        title: { display: true, text: 'Total Fees vs. Total Profit and Loss', color: 'var(--text-color)' },
-                        tooltip: { 
-                          callbacks: { 
-                            label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c.parsed.y)}` 
-                          }
-                        }
-                    },
-                    animation: {
-                        duration: 1500,
-                        easing: 'easeInOutQuart'
-                    }
-                }
-            });
-
-            // Render Line Chart (Cumulative Growth)
-            const ctxLine = document.getElementById('lineChart').getContext('2d');
-            const dates = summary.timeseries.map(item => item.date.toLocaleDateString());
-            const pnlData = summary.timeseries.map(item => item.pnl);
-            const feesData = summary.timeseries.map(item => item.fees);
-
-            const pnlGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
-            pnlGradient.addColorStop(0, 'rgba(40, 167, 69, 0.4)');
-            pnlGradient.addColorStop(1, 'rgba(40, 167, 69, 0)');
-            const feesGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
-            feesGradient.addColorStop(0, 'rgba(0, 123, 255, 0.4)');
-            feesGradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
-
-            new Chart(ctxLine, {
-              type: 'line',
-              data: {
-                labels: dates,
-                datasets: [
-                  {
-                    label: 'Cumulative PnL',
-                    data: pnlData,
-                    borderColor: 'rgba(40, 167, 69, 1)',
-                    backgroundColor: pnlGradient,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: 'rgba(40, 167, 69, 1)',
-                  },
-                  {
-                    label: 'Cumulative Fees',
-                    data: feesData,
-                    borderColor: 'rgba(0, 123, 255, 1)',
-                    backgroundColor: feesGradient,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: 'rgba(0, 123, 255, 1)',
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    grid: { color: 'rgba(0,0,0,0.05)' },
-                    title: { display: true, text: 'Date', color: 'var(--secondary-color)' },
-                    ticks: { color: 'var(--secondary-color)' }
-                  },
-                  y: {
-                    grid: { color: 'rgba(0,0,0,0.05)' },
-                    title: { display: true, text: 'Amount (USDT)', color: 'var(--secondary-color)' },
-                    ticks: { color: 'var(--secondary-color)' }
-                  }
-                },
-                plugins: {
-                  legend: { position: 'top', labels: { color: 'var(--text-color)' } },
-                  title: { display: true, text: 'Cumulative PnL and Fees Over Time', color: 'var(--text-color)' },
-                  tooltip: { mode: 'index', intersect: false }
-                },
-                animation: {
-                  duration: 2000,
-                  easing: 'easeInOutQuart'
-                }
-              }
-            });
-
-            // Render Wallet Balance Chart
-            const ctxWallet = document.getElementById('walletChart').getContext('2d');
-            const walletData = summary.timeseries.map(item => item.walletBalance);
-            const walletGradient = ctxWallet.createLinearGradient(0, 0, 0, 400);
-            walletGradient.addColorStop(0, 'rgba(255, 159, 64, 0.4)');
-            walletGradient.addColorStop(1, 'rgba(255, 159, 64, 0)');
-
-            new Chart(ctxWallet, {
-              type: 'line',
-              data: {
-                labels: dates,
-                datasets: [
-                  {
-                    label: 'Cumulative Wallet Balance',
-                    data: walletData,
-                    borderColor: 'rgba(255, 159, 64, 1)',
-                    backgroundColor: walletGradient,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: 'rgba(255, 159, 64, 1)',
-                  }
-                ]
-              },
-              options: {
-                responsive: true,
-                scales: {
-                  x: {
-                    grid: { color: 'rgba(0,0,0,0.05)' },
-                    title: { display: true, text: 'Date', color: 'var(--secondary-color)' },
-                    ticks: { color: 'var(--secondary-color)' }
-                  },
-                y: {
-                    grid: { color: 'rgba(0,0,0,0.05)' },
-                    title: { display: true, text: 'Balance (USDT)', color: 'var(--secondary-color)' },
-                    ticks: { color: 'var(--secondary-color)' }
-                  }
-                },
-                plugins: {
-                  legend: { display: false },
-                  title: { display: true, text: 'Wallet Balance Growth Over Time', color: 'var(--text-color)' },
-                  tooltip: { mode: 'index', intersect: false }
-                },
-                animation: {
-                  duration: 2000,
-                  easing: 'easeInOutQuart'
-                }
-              }
-            });
-
-
-            // Render Pie Charts
-            const pieChartContainer = document.getElementById('pie-charts');
-            for (const symbol in summary.perSymbol) {
-              const values = summary.perSymbol[symbol];
-              const totalFees = Math.abs(values.tradingFees) + Math.abs(values.fundingFees) + Math.abs(values.liquidation);
-              const totalPnL = values.profitAndLoss;
-              
-              if (totalFees !== 0 || totalPnL !== 0) {
-                  const chartItem = document.createElement('div');
-                  chartItem.className = 'pie-chart-item';
-                  chartItem.innerHTML = `<h4 style="text-align: center; color: var(--secondary-color);">${symbol}</h4><canvas id="pieChart-${symbol}" onclick="scrollToSymbol('${symbol}')"></canvas>`;
-                  pieChartContainer.appendChild(chartItem);
-
-                  const ctxPie = document.getElementById(`pieChart-${symbol}`).getContext('2d');
-                  new Chart(ctxPie, {
-                      type: 'pie',
-                      data: {
-                          labels: ['Total Fees', 'Total P&L'],
-                          datasets: [{
-                              data: [totalFees, totalPnL],
-                              backgroundColor: ['#5bc0de', '#5cb85c'],
-                              borderColor: ['var(--bg-color)', 'var(--bg-color)'],
-                              borderWidth: 2,
-                          }]
-                      },
-                      options: {
-                          responsive: true,
-                          plugins: {
-                              legend: { position: 'top', labels: { color: 'var(--text-color)' } },
-                              datalabels: {
-                                color: 'var(--text-color)',
-                                formatter: (value, context) => {
-                                  const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
-                                  const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
-                                  return percentage + '%';
-                                },
-                                font: {
-                                  weight: 'bold'
-                                }
-                              },
-                              title: { display: false },
-                              tooltip: {
-                                  callbacks: {
-                                      label: (context) => {
-                                          const label = context.label || '';
-                                          const value = context.parsed || 0;
-                                          const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
-                                          const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
-                                          return `${label}: ${value.toFixed(2)} USDT (${percentage}%)`;
-                                      }
-                                  }
-                              }
-                          }
-                      },
-                      plugins: [ChartDataLabels]
-                  });
-              }
-            }
-
-            // Function to scroll to the symbol table row
-            window.scrollToSymbol = (symbol) => {
-                const element = document.getElementById(`symbol-row-${symbol}`);
-                if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }
-            };
-
-
-            updateProgress(100);
-            setTimeout(() => (progressContainer.style.display = "none"), 500);
-          }, 200);
         } catch (err) {
           console.error(err);
-          errorDiv.textContent = "Failed to parse file. Please ensure it's a valid transaction history file.";
-          progressContainer.style.display = "none";
-          homepage.style.display = 'block';
-          outputSection.style.display = 'none';
+          this.errorDiv.textContent = `Error: ${err.message}. Please ensure it's a valid transaction history file.`;
+          this.progressContainer.style.display = "none";
+          this.homepage.style.display = 'block';
+          this.outputSection.style.display = 'none';
         }
-      };
-      reader.readAsArrayBuffer(file);
+      }
+
+      /**
+       * Reads the file asynchronously using a Promise.
+       * @param {File} file The file object to read.
+       * @returns {Promise<Array<Object>>} A promise that resolves with the parsed sheet data.
+       */
+      readFileAsync(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+
+          reader.onload = (e) => {
+            try {
+              this.showProgress(50);
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
+              const sheetName = workbook.SheetNames[0];
+              const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
+              resolve(sheet);
+            } catch (err) {
+              reject(err);
+            }
+          };
+
+          reader.onerror = (err) => reject(err);
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      /**
+       * Updates the progress bar visually.
+       * @param {number} percent The percentage to set the progress bar to.
+       */
+      showProgress(percent) {
+        this.progressContainer.style.display = "block";
+        this.progressBar.style.width = percent + "%";
+        this.progressBar.textContent = `${Math.round(percent)}%`;
+      }
+
+      /**
+       * Processes the raw sheet data to generate a summary.
+       * @param {Array<Object>} sheet The array of transaction objects.
+       * @param {number} initialBalance The user's initial wallet balance.
+       * @returns {Object} A structured summary of the data.
+       */
+      processData(sheet, initialBalance) {
+        const summary = {
+          perSymbol: {},
+          transfers: { transferIn: 0, transferOut: 0 },
+          timeseries: []
+        };
+        const typeMap = {
+          'COMMISSION': 'tradingFees', 'REALIZED_PNL': 'profitAndLoss',
+          'FUNDING_FEE': 'fundingFees', 'LIQUIDATION_FEE': 'liquidation',
+          'TRANSFER': 'transfer', 'STRATEGY_UMFUTURES_TRANSFER': 'transfer',
+          'BFUSD_REWARD': 'tradingFees'
+        };
+
+        const sortedSheet = sheet.sort((a, b) => new Date(a['Date(UTC)']) - new Date(b['Date(UTC)']));
+        let cumulativePnL = 0;
+        let cumulativeFees = 0;
+        let cumulativeWalletBalance = initialBalance;
+
+        sortedSheet.forEach((row) => {
+          const normalizedRow = Object.fromEntries(
+            Object.entries(row).map(([k, v]) => [k.toString().trim().toUpperCase(), v])
+          );
+          
+          const symbol = normalizedRow["SYMBOL"] || "--";
+          const type = normalizedRow["TYPE"] || "UNKNOWN";
+          const amount = Number(normalizedRow["AMOUNT"] || 0);
+
+          if (!summary.perSymbol[symbol]) {
+            summary.perSymbol[symbol] = { tradingFees: 0, profitAndLoss: 0, fundingFees: 0, liquidation: 0 };
+          }
+          const category = typeMap[type] || 'unknown';
+
+          if (category === 'transfer') {
+            if (amount > 0) {
+              summary.transfers.transferIn += amount;
+            } else {
+              summary.transfers.transferOut += amount;
+            }
+            cumulativeWalletBalance += amount;
+          } else {
+            if (summary.perSymbol[symbol][category] !== undefined) {
+              summary.perSymbol[symbol][category] += amount;
+            }
+          }
+
+          const fees = Math.abs(normalizedRow['TYPE'] === 'COMMISSION' ? amount : 0) +
+                       Math.abs(normalizedRow['TYPE'] === 'FUNDING_FEE' ? amount : 0) +
+                       Math.abs(normalizedRow['TYPE'] === 'LIQUIDATION_FEE' ? amount : 0);
+          const pnl = normalizedRow['TYPE'] === 'REALIZED_PNL' ? amount : 0;
+          cumulativePnL += pnl;
+          cumulativeFees += fees;
+          
+          summary.timeseries.push({
+            date: new Date(normalizedRow['DATE(UTC)']),
+            pnl: cumulativePnL,
+            fees: cumulativeFees,
+            walletBalance: initialBalance + cumulativePnL + cumulativeFees
+          });
+        });
+        return summary;
+      }
+
+      /**
+       * Renders all the HTML output and charts based on the processed summary.
+       * @param {Object} summary The data summary object.
+       */
+      renderOutput(summary) {
+        let grandTotals = { tradingFees: 0, profitAndLoss: 0, fundingFees: 0, liquidation: 0 };
+        for (const symbol in summary.perSymbol) {
+          for (const key in summary.perSymbol[symbol]) {
+            grandTotals[key] += summary.perSymbol[symbol][key];
+          }
+        }
+
+        const totalFees = Math.abs(grandTotals.tradingFees) + Math.abs(grandTotals.fundingFees) + Math.abs(grandTotals.liquidation);
+        const totalPnL = grandTotals.profitAndLoss;
+
+        let htmlOutput = `
+          <h2>Total Fees vs. Profit & Loss</h2>
+          <div class="chart-container"><canvas id="barChart"></canvas></div>
+          <h2>PnL Growth & Fees Analysis</h2>
+          <div class="chart-container"><canvas id="lineChart"></canvas></div>
+          <h2>Wallet Balance Growth</h2>
+          <div class="chart-container"><canvas id="walletChart"></canvas></div>
+          <h2>Summary per Symbol</h2>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th title="The trading pair or contract symbol (e.g., BTCUSDT).">Symbol</th>
+                  <th title="Trading fees are based on trade size. They are a cost (negative value) for market takers (0.05%) and can be a rebate (positive value) for market makers (0.02%).">Trading Fees</th>
+                  <th title="Realized Profit and Loss (PnL) from closed positions.">Profit & Loss</th>
+                  <th title="Funding fees are periodic payments exchanged between long and short traders to keep the contract price in line with the underlying asset price. They can be positive or negative.">Funding Fees</th>
+                  <th title="Fees incurred from the liquidation of a position.">Liquidation</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${Object.entries(summary.perSymbol).map(([symbol, values]) => `
+                  <tr id="symbol-row-${symbol}">
+                    <td>${symbol}</td>
+                    <td>${values.tradingFees.toFixed(2)}</td>
+                    <td>${values.profitAndLoss.toFixed(2)}</td>
+                    <td>${values.fundingFees.toFixed(2)}</td>
+                    <td>${values.liquidation.toFixed(2)}</td>
+                  </tr>
+                `).join('')}
+                <tr style="font-weight:bold;background:#f0f0f0;">
+                  <td>Grand Total</td>
+                  <td>${grandTotals.tradingFees.toFixed(2)}</td>
+                  <td>${grandTotals.profitAndLoss.toFixed(2)}</td>
+                  <td>${grandTotals.fundingFees.toFixed(2)}</td>
+                  <td>${grandTotals.liquidation.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <h2>Fees vs. PnL per Symbol</h2>
+          <div class="pie-chart-container" id="pie-charts"></div>
+          <h2>Transfer Summary</h2>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th title="Total amount of assets transferred into your account.">Transfer In (Positive)</th>
+                  <th title="Total amount of assets transferred out of your account.">Transfer Out (Negative)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>${summary.transfers.transferIn.toFixed(2)}</td>
+                  <td>${summary.transfers.transferOut.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+        this.outputDiv.innerHTML = htmlOutput;
+
+        this.renderBarChart(totalFees, totalPnL);
+        this.renderLineChart(summary.timeseries);
+        this.renderWalletChart(summary.timeseries);
+        this.renderPieCharts(summary.perSymbol);
+      }
+
+      /**
+       * Renders the bar chart for total fees vs. PnL.
+       * @param {number} totalFees Total fees for the period.
+       * @param {number} totalPnL Total PnL for the period.
+       */
+      renderBarChart(totalFees, totalPnL) {
+        const ctxBar = document.getElementById('barChart').getContext('2d');
+        new Chart(ctxBar, {
+          type: 'bar',
+          data: {
+            labels: ['Total Fees', 'Total P&L'],
+            datasets: [{
+              label: 'Amount (USDT)',
+              data: [totalFees, totalPnL],
+              backgroundColor: [
+                '#5bc0de', // Fees color
+                '#5cb85c'  // PnL color
+              ],
+              borderColor: [
+                '#46a6c7',
+                '#46a646'
+              ],
+              borderWidth: 1,
+              borderRadius: 5,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { 
+                beginAtZero: true, 
+                grid: { color: 'rgba(0,0,0,0.05)' }, 
+                ticks: { color: 'var(--secondary-color)' } 
+              },
+              x: { 
+                grid: { display: false }, 
+                ticks: { color: 'var(--secondary-color)' } 
+              }
+            },
+            plugins: {
+              legend: { display: false },
+              title: { display: true, text: 'Total Fees vs. Total Profit and Loss', color: 'var(--text-color)' },
+              tooltip: { 
+                callbacks: { 
+                  label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c.parsed.y)}` 
+                }
+              }
+            },
+            animation: {
+              duration: 1500,
+              easing: 'easeInOutQuart'
+            }
+          }
+        });
+      }
+
+      /**
+       * Renders the line chart for cumulative PnL and fees.
+       * @param {Array<Object>} timeseries The time series data.
+       */
+      renderLineChart(timeseries) {
+        const ctxLine = document.getElementById('lineChart').getContext('2d');
+        const dates = timeseries.map(item => item.date.toLocaleDateString());
+        const pnlData = timeseries.map(item => item.pnl);
+        const feesData = timeseries.map(item => item.fees);
+
+        // Create gradients for a more polished look
+        const pnlGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
+        pnlGradient.addColorStop(0, 'rgba(40, 167, 69, 0.4)');
+        pnlGradient.addColorStop(1, 'rgba(40, 167, 69, 0)');
+        const feesGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
+        feesGradient.addColorStop(0, 'rgba(0, 123, 255, 0.4)');
+        feesGradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
+
+        new Chart(ctxLine, {
+          type: 'line',
+          data: {
+            labels: dates,
+            datasets: [
+              {
+                label: 'Cumulative PnL',
+                data: pnlData,
+                borderColor: 'rgba(40, 167, 69, 1)',
+                backgroundColor: pnlGradient,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgba(40, 167, 69, 1)',
+              },
+              {
+                label: 'Cumulative Fees',
+                data: feesData,
+                borderColor: 'rgba(0, 123, 255, 1)',
+                backgroundColor: feesGradient,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgba(0, 123, 255, 1)',
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { 
+                grid: { color: 'rgba(0,0,0,0.05)' }, 
+                title: { display: true, text: 'Date', color: 'var(--secondary-color)' }, 
+                ticks: { color: 'var(--secondary-color)' } 
+              },
+              y: { 
+                grid: { color: 'rgba(0,0,0,0.05)' }, 
+                title: { display: true, text: 'Amount (USDT)', color: 'var(--secondary-color)' }, 
+                ticks: { color: 'var(--secondary-color)' } 
+              }
+            },
+            plugins: { 
+              legend: { position: 'top', labels: { color: 'var(--text-color)' } }, 
+              title: { display: true, text: 'Cumulative PnL and Fees Over Time', color: 'var(--text-color)' }, 
+              tooltip: { mode: 'index', intersect: false } 
+            },
+            animation: { 
+              duration: 2000, 
+              easing: 'easeInOutQuart' 
+            }
+          }
+        });
+      }
+
+      /**
+       * Renders the line chart for cumulative wallet balance.
+       * @param {Array<Object>} timeseries The time series data.
+       */
+      renderWalletChart(timeseries) {
+        const ctxWallet = document.getElementById('walletChart').getContext('2d');
+        const walletData = timeseries.map(item => item.walletBalance);
+        const walletGradient = ctxWallet.createLinearGradient(0, 0, 0, 400);
+        walletGradient.addColorStop(0, 'rgba(255, 159, 64, 0.4)');
+        walletGradient.addColorStop(1, 'rgba(255, 159, 64, 0)');
+
+        new Chart(ctxWallet, {
+          type: 'line',
+          data: {
+            labels: timeseries.map(item => item.date.toLocaleDateString()),
+            datasets: [
+              {
+                label: 'Cumulative Wallet Balance',
+                data: walletData,
+                borderColor: 'rgba(255, 159, 64, 1)',
+                backgroundColor: walletGradient,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 7,
+                pointBackgroundColor: 'rgba(255, 159, 64, 1)',
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { 
+                grid: { color: 'rgba(0,0,0,0.05)' }, 
+                title: { display: true, text: 'Date', color: 'var(--secondary-color)' }, 
+                ticks: { color: 'var(--secondary-color)' } 
+              },
+              y: { 
+                grid: { color: 'rgba(0,0,0,0.05)' }, 
+                title: { display: true, text: 'Balance (USDT)', color: 'var(--secondary-color)' }, 
+                ticks: { color: 'var(--secondary-color)' } 
+              }
+            },
+            plugins: { 
+              legend: { display: false }, 
+              title: { display: true, text: 'Wallet Balance Growth Over Time', color: 'var(--text-color)' }, 
+              tooltip: { mode: 'index', intersect: false } 
+            },
+            animation: { 
+              duration: 2000, 
+              easing: 'easeInOutQuart' 
+            }
+          }
+        });
+      }
+
+      /**
+       * Renders individual pie charts for each trading symbol.
+       * @param {Object} perSymbol The summary data per symbol.
+       */
+      renderPieCharts(perSymbol) {
+        const pieChartContainer = document.getElementById('pie-charts');
+        for (const symbol in perSymbol) {
+          const values = perSymbol[symbol];
+          const totalFees = Math.abs(values.tradingFees) + Math.abs(values.fundingFees) + Math.abs(values.liquidation);
+          const totalPnL = values.profitAndLoss;
+          
+          if (totalFees !== 0 || totalPnL !== 0) {
+            const chartItem = document.createElement('div');
+            chartItem.className = 'pie-chart-item';
+            chartItem.innerHTML = `<h4 style="text-align: center; color: var(--secondary-color);">${symbol}</h4><canvas id="pieChart-${symbol}" onclick="scrollToSymbol('${symbol}')"></canvas>`;
+            pieChartContainer.appendChild(chartItem);
+
+            const ctxPie = document.getElementById(`pieChart-${symbol}`).getContext('2d');
+            new Chart(ctxPie, {
+              type: 'pie',
+              data: {
+                labels: ['Total Fees', 'Total P&L'],
+                datasets: [{
+                  data: [totalFees, totalPnL],
+                  backgroundColor: ['#5bc0de', '#5cb85c'],
+                  borderColor: ['var(--bg-color)', 'var(--bg-color)'],
+                  borderWidth: 2,
+                }]
+              },
+              options: {
+                responsive: true,
+                plugins: {
+                  legend: { position: 'top', labels: { color: 'var(--text-color)' } },
+                  datalabels: {
+                    color: 'var(--text-color)',
+                    formatter: (value, context) => {
+                      const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
+                      const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
+                      return percentage + '%';
+                    },
+                    font: { weight: 'bold' }
+                  },
+                  title: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: (context) => {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
+                        const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
+                        return `${label}: ${value.toFixed(2)} USDT (${percentage}%)`;
+                      }
+                    }
+                  }
+                }
+              },
+              plugins: [ChartDataLabels]
+            });
+          }
+        }
+      }
+      
+      /**
+       * Scrolls the page to the specified symbol's table row.
+       * @param {string} symbol The trading symbol to scroll to.
+       */
+      scrollToSymbol(symbol) {
+        const element = document.getElementById(`symbol-row-${symbol}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
     }
+    
+    // Initialize the application once the DOM is ready.
+    document.addEventListener('DOMContentLoaded', () => {
+        new App();
+    });
   </script>
 </body>
 </html>
