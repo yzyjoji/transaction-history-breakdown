@@ -2,19 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Transaction History Breakdown</title>
+  <title>Futures Transaction Analyzer</title>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
     :root {
-      --bg-color: #f8f9fa;
+      --bg-color: #f5f5f5;
       --card-bg: #ffffff;
-      --text-color: #343a40;
-      --primary-color: #007bff;
-      --secondary-color: #6c757d;
-      --accent-color: #28a745;
-      --warning-color: #dc3545;
-      --border-color: #e9ecef;
+      --text-color: #333333;
+      --primary-color: #fcd535;
+      --secondary-color: #666666;
+      --accent-color: #00b578;
+      --warning-color: #ff4655;
+      --border-color: #e0e0e0;
+      --bar-color-fees: #ff4655;
+      --bar-color-pnl: #00b578;
+      --line-color-pnl: #00b578;
+      --line-color-fees: #f0b90b;
+      --scrollbar-thumb: #999;
+      --scrollbar-track: #e0e0e0;
     }
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
@@ -37,11 +44,11 @@
     }
     label.file-label {
       display: block;
-      margin: 0 auto 20px auto;
+      margin: 20px auto 20px auto;
       padding: 12px 20px;
       border: 2px solid var(--primary-color);
       border-radius: 8px;
-      background-color: #e8f5fd;
+      background-color: #fff9e6;
       cursor: pointer;
       font-size: 1.1em;
       font-weight: 600;
@@ -50,8 +57,8 @@
       transition: all 0.3s ease;
     }
     label.file-label:hover {
-      background-color: #d1ecfd;
-      border-color: #0056b3;
+      background-color: #fff4d6;
+      border-color: #e6c831;
     }
     .container {
       max-width: 1200px;
@@ -59,7 +66,7 @@
       padding: 20px;
       background: var(--card-bg);
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
       text-align: center;
     }
     .intro-text, .fee-description {
@@ -108,7 +115,7 @@
     }
     th {
       background: var(--primary-color);
-      color: white;
+      color: #333333;
       font-weight: 600;
       text-align: center;
       cursor: help;
@@ -121,7 +128,7 @@
     }
     tbody tr:last-child {
       font-weight: bold;
-      background: #f2f2f2;
+      background: #f0f0f0;
       border-top: 2px solid var(--secondary-color);
     }
     .error {
@@ -135,16 +142,16 @@
       width: 80%;
       max-width: 400px;
       margin: 15px auto;
-      background: #e9ecef;
+      background: #e0e0e0;
       height: 20px;
       border-radius: 10px;
       overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
     }
     #progressBar {
       height: 100%;
       width: 0%;
-      background: linear-gradient(to right, var(--accent-color), #218838);
+      background: linear-gradient(to right, var(--accent-color), #00a06c);
       transition: width 0.4s ease-out;
       border-radius: 10px;
       text-align: center;
@@ -161,22 +168,64 @@
       border-bottom: 1px solid var(--border-color);
       padding-bottom: 8px;
     }
-    #chartContainer {
+    .chart-container {
       width: 100%;
       max-width: 700px;
       margin: 40px auto;
       background: var(--card-bg);
       padding: 20px;
       border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
     #output-section {
         display: none;
     }
+    .wallet-input {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .wallet-input input {
+      padding: 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 5px;
+      width: 100%;
+      max-width: 250px;
+      box-sizing: border-box;
+      text-align: center;
+      margin-top: 10px;
+      background: #f9f9f9;
+      color: var(--text-color);
+    }
+    .pie-chart-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
+    .pie-chart-item {
+        width: 100%;
+        max-width: 250px;
+    }
+    .pie-chart-item canvas {
+        cursor: pointer;
+    }
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--scrollbar-thumb);
+        border-radius: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
   </style>
 </head>
 <body>
-  <h1>✨ Futures Transaction Analyzer</h1>
+  <h1>Futures Transaction Analyzer</h1>
   <div class="container" id="homepage">
     <div class="intro-text">
       <p>This page is designed to help you analyze your Binance Futures transaction history. By uploading your exported `.xlsx` or `.csv` file, you can get a clear overview of your trading activity, including a breakdown of your fees and profit and loss over time.</p>
@@ -198,6 +247,10 @@
         </li>
       </ul>
     </div>
+    <div class="wallet-input">
+      <label for="initialBalance">Enter your initial wallet balance (in USDT)</label>
+      <input type="number" id="initialBalance" placeholder="e.g., 1000.00" value="0" />
+    </div>
     <input type="file" id="fileInput" accept=".xlsx, .csv" />
     <label for="fileInput" class="file-label">Upload Your Transaction History File</label>
     <div id="progressContainer"><div id="progressBar"></div></div>
@@ -215,6 +268,7 @@
     const outputDiv = document.getElementById("output");
     const progressContainer = document.getElementById("progressContainer");
     const progressBar = document.getElementById("progressBar");
+    const initialBalanceInput = document.getElementById("initialBalance");
 
     fileInput.addEventListener("change", handleFile);
 
@@ -228,7 +282,9 @@
       errorDiv.textContent = "";
       outputDiv.innerHTML = "";
 
-      if (!file) {
+      const initialBalance = parseFloat(initialBalanceInput.value);
+      if (isNaN(initialBalance)) {
+        errorDiv.textContent = "Please enter a valid initial balance.";
         return;
       }
 
@@ -291,6 +347,7 @@
             const sortedSheet = sheet.sort((a, b) => new Date(a['Date(UTC)']) - new Date(b['Date(UTC)']));
             let cumulativePnL = 0;
             let cumulativeFees = 0;
+            let cumulativeWalletBalance = initialBalance;
 
             sortedSheet.forEach((row) => {
               const normalizedRow = Object.fromEntries(
@@ -318,6 +375,7 @@
                 } else {
                   summary.transfers.transferOut += amount;
                 }
+                cumulativeWalletBalance += amount;
               } else if (category in summary.perSymbol[symbol]) {
                 summary.perSymbol[symbol][category] += amount;
               } else if (category === 'tradingFees' && type === 'BFUSD_REWARD') {
@@ -337,6 +395,7 @@
                 date: new Date(normalizedRow['DATE(UTC)']),
                 pnl: cumulativePnL,
                 fees: cumulativeFees,
+                walletBalance: initialBalance + cumulativePnL + cumulativeFees
               });
             });
 
@@ -354,16 +413,18 @@
 
             const totalFees = Math.abs(grandTotals.tradingFees) + Math.abs(grandTotals.fundingFees) + Math.abs(grandTotals.liquidation);
             const totalPnL = grandTotals.profitAndLoss;
-            const chartColorFees = totalFees > totalPnL ? '#e74c3c' : '#3498db';
-            const chartColorPNL = '#2ecc71';
             
             // --- Total Fees vs P&L Chart ---
             htmlOutput += '<h2>Total Fees vs. Profit & Loss</h2>';
-            htmlOutput += `<div id="chartContainer"><canvas id="barChart"></canvas></div>`;
+            htmlOutput += `<div class="chart-container"><canvas id="barChart"></canvas></div>`;
 
             // --- P&L Growth and Fees Analysis ---
             htmlOutput += '<h2>PnL Growth & Fees Analysis</h2>';
-            htmlOutput += `<div id="chartContainer"><canvas id="lineChart"></canvas></div>`;
+            htmlOutput += `<div class="chart-container"><canvas id="lineChart"></canvas></div>`;
+
+            // --- Wallet Balance Growth Analysis ---
+            htmlOutput += '<h2>Wallet Balance Growth</h2>';
+            htmlOutput += `<div class="chart-container"><canvas id="walletChart"></canvas></div>`;
 
             // --- Main Summary Table ---
             htmlOutput += '<h2>Summary per Symbol</h2>';
@@ -381,7 +442,7 @@
             
             for (const symbol in summary.perSymbol) {
               const values = summary.perSymbol[symbol];
-              htmlOutput += `<tr>
+              htmlOutput += `<tr id="symbol-row-${symbol}">
                                 <td>${symbol}</td>
                                 <td>${values.tradingFees.toFixed(2)}</td>
                                 <td>${values.profitAndLoss.toFixed(2)}</td>
@@ -390,7 +451,7 @@
                               </tr>`;
             }
 
-            htmlOutput += `<tr style="font-weight:bold;background:#fafafa;">
+            htmlOutput += `<tr style="font-weight:bold;background:#f0f0f0;">
                             <td>Grand Total</td>
                             <td>${grandTotals.tradingFees.toFixed(2)}</td>
                             <td>${grandTotals.profitAndLoss.toFixed(2)}</td>
@@ -399,6 +460,10 @@
                           </tr>`;
             htmlOutput += `</tbody></table></div>`;
             
+            // --- Individual Symbol Pie Charts ---
+            htmlOutput += '<h2>Fees vs. PnL per Symbol</h2>';
+            htmlOutput += `<div class="pie-chart-container" id="pie-charts"></div>`;
+
             // --- Separate Transfer Tables ---
             htmlOutput += '<h2>Transfer Summary</h2>';
             htmlOutput += `<div class="table-container"><table>
@@ -427,21 +492,43 @@
                     datasets: [{
                         label: 'Amount (USDT)',
                         data: [totalFees, totalPnL],
-                        backgroundColor: [chartColorFees, chartColorPNL],
-                        borderColor: [chartColorFees, chartColorPNL],
-                        borderWidth: 1
+                        backgroundColor: [
+                          '#5bc0de',
+                          '#5cb85c'
+                        ],
+                        borderColor: [
+                          '#46a6c7',
+                          '#46a646'
+                        ],
+                        borderWidth: 1,
+                        borderRadius: 5,
                     }]
                 },
                 options: {
                     responsive: true,
                     scales: {
-                        y: { beginAtZero: true, grid: { color: '#e9ecef' } },
-                        x: { grid: { color: '#e9ecef' } }
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { color: 'var(--secondary-color)' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'var(--secondary-color)' }
+                        }
                     },
                     plugins: {
                         legend: { display: false },
-                        title: { display: true, text: 'Total Fees vs. Total Profit and Loss' },
-                        tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c.parsed.y)}` } }
+                        title: { display: true, text: 'Total Fees vs. Total Profit and Loss', color: 'var(--text-color)' },
+                        tooltip: { 
+                          callbacks: { 
+                            label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c.parsed.y)}` 
+                          }
+                        }
+                    },
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeInOutQuart'
                     }
                 }
             });
@@ -452,6 +539,13 @@
             const pnlData = summary.timeseries.map(item => item.pnl);
             const feesData = summary.timeseries.map(item => item.fees);
 
+            const pnlGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
+            pnlGradient.addColorStop(0, 'rgba(40, 167, 69, 0.4)');
+            pnlGradient.addColorStop(1, 'rgba(40, 167, 69, 0)');
+            const feesGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
+            feesGradient.addColorStop(0, 'rgba(0, 123, 255, 0.4)');
+            feesGradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
+
             new Chart(ctxLine, {
               type: 'line',
               data: {
@@ -461,17 +555,23 @@
                     label: 'Cumulative PnL',
                     data: pnlData,
                     borderColor: 'rgba(40, 167, 69, 1)',
-                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
-                    fill: false,
-                    tension: 0.1
+                    backgroundColor: pnlGradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: 'rgba(40, 167, 69, 1)',
                   },
                   {
                     label: 'Cumulative Fees',
                     data: feesData,
                     borderColor: 'rgba(0, 123, 255, 1)',
-                    backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                    fill: false,
-                    tension: 0.1
+                    backgroundColor: feesGradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: 'rgba(0, 123, 255, 1)',
                   }
                 ]
               },
@@ -479,21 +579,147 @@
                 responsive: true,
                 scales: {
                   x: {
-                    grid: { color: '#e9ecef' },
-                    title: { display: true, text: 'Date' }
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    title: { display: true, text: 'Date', color: 'var(--secondary-color)' },
+                    ticks: { color: 'var(--secondary-color)' }
                   },
                   y: {
-                    grid: { color: '#e9ecef' },
-                    title: { display: true, text: 'Amount (USDT)' }
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    title: { display: true, text: 'Amount (USDT)', color: 'var(--secondary-color)' },
+                    ticks: { color: 'var(--secondary-color)' }
                   }
                 },
                 plugins: {
-                  legend: { position: 'top' },
-                  title: { display: true, text: 'Cumulative PnL and Fees Over Time' },
+                  legend: { position: 'top', labels: { color: 'var(--text-color)' } },
+                  title: { display: true, text: 'Cumulative PnL and Fees Over Time', color: 'var(--text-color)' },
                   tooltip: { mode: 'index', intersect: false }
+                },
+                animation: {
+                  duration: 2000,
+                  easing: 'easeInOutQuart'
                 }
               }
             });
+
+            // Render Wallet Balance Chart
+            const ctxWallet = document.getElementById('walletChart').getContext('2d');
+            const walletData = summary.timeseries.map(item => item.walletBalance);
+            const walletGradient = ctxWallet.createLinearGradient(0, 0, 0, 400);
+            walletGradient.addColorStop(0, 'rgba(255, 159, 64, 0.4)');
+            walletGradient.addColorStop(1, 'rgba(255, 159, 64, 0)');
+
+            new Chart(ctxWallet, {
+              type: 'line',
+              data: {
+                labels: dates,
+                datasets: [
+                  {
+                    label: 'Cumulative Wallet Balance',
+                    data: walletData,
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    backgroundColor: walletGradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: 'rgba(255, 159, 64, 1)',
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                scales: {
+                  x: {
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    title: { display: true, text: 'Date', color: 'var(--secondary-color)' },
+                    ticks: { color: 'var(--secondary-color)' }
+                  },
+                y: {
+                    grid: { color: 'rgba(0,0,0,0.05)' },
+                    title: { display: true, text: 'Balance (USDT)', color: 'var(--secondary-color)' },
+                    ticks: { color: 'var(--secondary-color)' }
+                  }
+                },
+                plugins: {
+                  legend: { display: false },
+                  title: { display: true, text: 'Wallet Balance Growth Over Time', color: 'var(--text-color)' },
+                  tooltip: { mode: 'index', intersect: false }
+                },
+                animation: {
+                  duration: 2000,
+                  easing: 'easeInOutQuart'
+                }
+              }
+            });
+
+
+            // Render Pie Charts
+            const pieChartContainer = document.getElementById('pie-charts');
+            for (const symbol in summary.perSymbol) {
+              const values = summary.perSymbol[symbol];
+              const totalFees = Math.abs(values.tradingFees) + Math.abs(values.fundingFees) + Math.abs(values.liquidation);
+              const totalPnL = values.profitAndLoss;
+              
+              if (totalFees !== 0 || totalPnL !== 0) {
+                  const chartItem = document.createElement('div');
+                  chartItem.className = 'pie-chart-item';
+                  chartItem.innerHTML = `<h4 style="text-align: center; color: var(--secondary-color);">${symbol}</h4><canvas id="pieChart-${symbol}" onclick="scrollToSymbol('${symbol}')"></canvas>`;
+                  pieChartContainer.appendChild(chartItem);
+
+                  const ctxPie = document.getElementById(`pieChart-${symbol}`).getContext('2d');
+                  new Chart(ctxPie, {
+                      type: 'pie',
+                      data: {
+                          labels: ['Total Fees', 'Total P&L'],
+                          datasets: [{
+                              data: [totalFees, totalPnL],
+                              backgroundColor: ['#5bc0de', '#5cb85c'],
+                              borderColor: ['var(--bg-color)', 'var(--bg-color)'],
+                              borderWidth: 2,
+                          }]
+                      },
+                      options: {
+                          responsive: true,
+                          plugins: {
+                              legend: { position: 'top', labels: { color: 'var(--text-color)' } },
+                              datalabels: {
+                                color: 'var(--text-color)',
+                                formatter: (value, context) => {
+                                  const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
+                                  const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
+                                  return percentage + '%';
+                                },
+                                font: {
+                                  weight: 'bold'
+                                }
+                              },
+                              title: { display: false },
+                              tooltip: {
+                                  callbacks: {
+                                      label: (context) => {
+                                          const label = context.label || '';
+                                          const value = context.parsed || 0;
+                                          const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
+                                          const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
+                                          return `${label}: ${value.toFixed(2)} USDT (${percentage}%)`;
+                                      }
+                                  }
+                              }
+                          }
+                      },
+                      plugins: [ChartDataLabels]
+                  });
+              }
+            }
+
+            // Function to scroll to the symbol table row
+            window.scrollToSymbol = (symbol) => {
+                const element = document.getElementById(`symbol-row-${symbol}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            };
+
 
             updateProgress(100);
             setTimeout(() => (progressContainer.style.display = "none"), 500);
