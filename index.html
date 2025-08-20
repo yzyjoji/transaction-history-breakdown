@@ -455,12 +455,18 @@
        * Handler for the paste button click event.
        */
       handlePastedData() {
-        const data = this.pasteDataArea.value.trim();
+        let data = this.pasteDataArea.value.trim();
         if (!data) {
           this.errorDiv.textContent = "Please paste some data to analyze.";
           return;
         }
         
+        const hasHeader = data.split('\n')[0].includes(',');
+        if (!hasHeader) {
+            const header = 'Timestamp(UTC),Type,Amount,Asset,Symbol\n';
+            data = header + data;
+        }
+
         try {
           this.showProgress(0);
           this.parsedData = this.parsePastedData(data);
@@ -570,8 +576,10 @@
 
 
       /**
-       * Processes the sheet data and renders the output.
+       * Processes the sheet data to generate a summary.
        * @param {Array<Object>} sheet The array of transaction objects.
+       * @param {number} initialBalance The user's initial wallet balance.
+       * @returns {Object} A structured summary of the data.
        */
       processAndRender(sheet) {
         this.errorDiv.textContent = "";
@@ -1106,4 +1114,3 @@
   </script>
 </body>
 </html>
-
