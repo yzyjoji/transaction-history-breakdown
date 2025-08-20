@@ -9,8 +9,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
     /*
-     * A CSS file to define the look and feel of the Futures Transaction Analyzer.
-     * The theme has been reverted to a clean, light mode.
+     * This CSS file has been updated to style the new table-like paste area.
+     * The theme is a clean, modern, and light mode.
      */
 
     /* --- Global Variables & General Styling --- */
@@ -26,6 +26,7 @@
       --shadow-light: rgba(0, 0, 0, 0.1);
       --scrollbar-thumb: #b0b0b0;
       --scrollbar-track: #f0f0f0;
+      --table-header-bg: #e9ecef;
     }
 
     body {
@@ -103,7 +104,7 @@
       display: none;
     }
 
-    label.file-label, .paste-btn, .analyze-btn, .action-btn {
+    label.file-label, .analyze-btn {
       display: block;
       margin: 20px auto;
       padding: 12px 20px;
@@ -119,19 +120,11 @@
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     }
     
-    .paste-btn, .analyze-btn {
-      width: 100%;
+    .analyze-btn {
       max-width: 300px;
       border-color: var(--accent-positive);
       background-color: #e6f7eb;
       color: var(--accent-positive);
-    }
-    
-    .action-btn {
-      max-width: 300px;
-      border-color: #f7a938;
-      background-color: #fcefd4;
-      color: #f7a938;
     }
 
     label.file-label:hover {
@@ -140,15 +133,9 @@
       transform: translateY(-2px);
     }
     
-    .paste-btn:hover, .analyze-btn:hover {
+    .analyze-btn:hover {
       background-color: #d4edda;
       border-color: #1e7e34;
-      transform: translateY(-2px);
-    }
-    
-    .action-btn:hover {
-      background-color: #fbdca8;
-      border-color: #d18d2b;
       transform: translateY(-2px);
     }
     
@@ -179,69 +166,80 @@
       box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
     }
     
+    /* --- Spreadsheet-like Paste Area --- */
     .paste-area {
       margin-top: 30px;
       border-top: 1px solid var(--border-color);
       padding-top: 20px;
     }
-    
+
     .paste-area h3 {
       text-align: center;
       margin-bottom: 15px;
     }
-    
-    .paste-area textarea {
-      width: 100%;
-      max-width: 800px;
-      min-height: 200px;
-      padding: 15px;
+
+    .spreadsheet-container {
       border: 1px solid var(--border-color);
       border-radius: 8px;
-      background: #fdfdfd;
-      color: var(--text-color);
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 0.9em;
-      resize: vertical;
-      box-sizing: border-box;
-      transition: border-color 0.2s ease;
-    }
-    
-    .paste-area textarea:focus {
-      outline: none;
-      border-color: var(--accent-positive);
-    }
-    
-    .paste-example {
+      overflow: hidden;
       width: 100%;
-      max-width: 800px;
-      margin: 15px auto;
-      padding: 10px;
-      background: #f8f9fa;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 0.85em;
-      white-space: pre-wrap;
-      word-break: break-all;
-      text-align: left;
+      max-width: 1000px;
+      margin: 0 auto 20px auto;
+      background: var(--card-bg);
+      box-shadow: 0 2px 8px var(--shadow-light);
     }
-    .paste-example h4 {
-      text-align: center;
-      margin-bottom: 10px;
-      color: var(--primary-color);
-    }
-    .paste-example table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .paste-example th, .paste-example td {
-      padding: 5px 10px;
-      border: 1px solid #dee2e6;
-      text-align: left;
-    }
-    .paste-example th {
-      background: #e9ecef;
+
+    .spreadsheet-header {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      background: var(--table-header-bg);
       font-weight: bold;
+      border-bottom: 1px solid var(--border-color);
+      text-align: center;
+    }
+
+    .spreadsheet-header .header-cell {
+      padding: 10px;
+      border-right: 1px solid var(--border-color);
+      cursor: help;
+    }
+
+    .spreadsheet-header .header-cell:last-child {
+      border-right: none;
+    }
+
+    .spreadsheet-body {
+      overflow-y: auto;
+      max-height: 400px;
+    }
+    
+    .spreadsheet-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .spreadsheet-row:last-child {
+      border-bottom: none;
+    }
+
+    .spreadsheet-cell {
+      padding: 10px;
+      border-right: 1px solid var(--border-color);
+      min-height: 38px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+      background: #fdfdfd;
+    }
+
+    .spreadsheet-cell:last-child {
+      border-right: none;
+    }
+    
+    .spreadsheet-cell[contenteditable="true"] {
+      cursor: text;
     }
 
     /* --- Progress Bar and Error Messages --- */
@@ -276,7 +274,7 @@
       font-weight: bold;
     }
     
-    /* --- Table Styling --- */
+    /* --- Table Styling for Output --- */
     .table-container {
       overflow-x: auto;
       margin-top: 20px;
@@ -417,38 +415,27 @@
     
     <div class="paste-area">
       <h3>Or, Paste Your CSV Data Below</h3>
-      <div class="paste-example">
-        <h4>Expected Data Format:</h4>
-        <table>
-          <thead>
-            <tr>
-              <th>Timestamp(UTC)</th>
-              <th>Type</th>
-              <th>Amount/Delta</th>
-              <th>Asset</th>
-              <th>Symbol</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>2025-08-18 22:45:21</td>
-              <td>COMMISSION</td>
-              <td>-0.17640230</td>
-              <td>USDT</td>
-              <td>XRPUSDT</td>
-            </tr>
-            <tr>
-              <td>2025-08-18 22:45:21</td>
-              <td>REALIZED_PNL</td>
-              <td>1.28970000</td>
-              <td>USDT</td>
-              <td>XRPUSDT</td>
-            </tr>
-          </tbody>
-        </table>
+      <p>Simply click the first cell and paste your data directly into the table. The values will automatically fill in the columns.</p>
+      <div class="spreadsheet-container">
+        <div class="spreadsheet-header">
+          <div class="header-cell" title="The date and time of the transaction (e.g., 2025-08-18 22:45:21).">Timestamp(UTC)</div>
+          <div class="header-cell" title="The type of transaction (e.g., COMMISSION, REALIZED_PNL).">Type</div>
+          <div class="header-cell" title="The amount of the transaction, which can be positive or negative.">Amount</div>
+          <div class="header-cell" title="The asset type (e.g., USDT).">Asset</div>
+          <div class="header-cell" title="The trading pair or symbol (e.g., XRPUSDT).">Symbol</div>
+        </div>
+        <div class="spreadsheet-body" id="pasteTableBody" contenteditable="true">
+          <!-- Default empty rows -->
+          <div class="spreadsheet-row">
+            <div class="spreadsheet-cell"></div>
+            <div class="spreadsheet-cell"></div>
+            <div class="spreadsheet-cell"></div>
+            <div class="spreadsheet-cell"></div>
+            <div class="spreadsheet-cell"></div>
+          </div>
+        </div>
       </div>
-      <textarea id="pasteData" placeholder="Paste your transaction data here..."></textarea>
-      <button class="paste-btn" id="pasteBtn">Analyze Pasted Data</button>
+      <button class="analyze-btn" id="analyzeDataBtn">Analyze My Transactions</button>
     </div>
     
     <div id="progressContainer"><div id="progressBar"></div></div>
@@ -467,8 +454,8 @@
       constructor() {
         // Cache DOM elements for efficient access
         this.fileInput = document.getElementById("fileInput");
-        this.pasteDataArea = document.getElementById("pasteData");
-        this.pasteBtn = document.getElementById("pasteBtn");
+        this.pasteTableBody = document.getElementById("pasteTableBody");
+        this.analyzeDataBtn = document.getElementById("analyzeDataBtn");
         this.homepage = document.getElementById("homepage");
         this.outputSection = document.getElementById("output-section");
         this.errorDiv = document.getElementById("error");
@@ -484,7 +471,8 @@
 
         // Bind event listeners to the class instance
         this.fileInput.addEventListener("change", this.handleFile.bind(this));
-        this.pasteBtn.addEventListener("click", this.handlePastedData.bind(this));
+        this.pasteTableBody.addEventListener('paste', this.handlePastedData.bind(this));
+        this.analyzeDataBtn.addEventListener('click', this.processAndRender.bind(this));
         
         // Expose a public method for the pie charts to use
         window.scrollToSymbol = this.scrollToSymbol.bind(this);
@@ -515,79 +503,59 @@
       }
       
       /**
-       * Handler for the paste button click event.
+       * Handler for the paste event on the table body.
+       * @param {ClipboardEvent} event The paste event.
        */
-      handlePastedData() {
-        let data = this.pasteDataArea.value.trim();
-        if (!data) {
-          this.handleError(new Error("No data found in pasted content. Please paste your transaction data to begin the analysis."));
+      handlePastedData(event) {
+        event.preventDefault(); // Prevent the default paste action
+        
+        const pastedText = event.clipboardData.getData('text/plain');
+        if (!pastedText) {
+          this.handleError(new Error("Pasted data is empty or not plain text."));
           return;
         }
-
+        
         try {
-          this.showProgress(0);
-          this.parsedData = this.parsePastedData(data);
-          this.showParsedDataTable(this.parsedData);
+          this.parsedData = this.parsePastedData(pastedText);
+          this.renderPastedData(this.parsedData);
         } catch (err) {
           this.handleError(err);
         }
       }
-
-      /**
-       * Renders a table of the parsed data for user confirmation.
-       * @param {Array<Object>} data The parsed transaction data.
-       */
-      showParsedDataTable(data) {
-        this.homepage.style.display = 'none';
-        this.outputSection.style.display = 'block';
-        this.outputDiv.innerHTML = `
-          <h2>Data Preview</h2>
-          <p>Please review the data below to ensure it was parsed correctly. If it looks good, click "Analyze".</p>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th>Timestamp(UTC)</th>
-                  <th>Type</th>
-                  <th>Delta</th>
-                  <th>Asset</th>
-                  <th>Symbol</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${data.map(row => `
-                  <tr>
-                    <td>${row['Timestamp(UTC)']}</td>
-                    <td>${row['Type']}</td>
-                    <td>${row['Delta'].toFixed(8)}</td>
-                    <td>${row['Asset']}</td>
-                    <td>${row['Symbol']}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-          <button id="analyzeDataBtn" class="analyze-btn">Analyze My Transactions</button>
-        `;
-        document.getElementById("analyzeDataBtn").addEventListener("click", () => {
-          this.processAndRender(this.parsedData);
-        });
-        
-        this.showProgress(10);
-        setTimeout(() => this.progressContainer.style.display = "none", 500);
-      }
       
       /**
-       * Parses raw pasted CSV data into a structured format and validates it.
-       * @param {string} rawData The raw CSV text data from the paste area.
+       * Renders the parsed data directly into the visual table.
+       * @param {Array<Object>} data The parsed transaction data.
+       */
+      renderPastedData(data) {
+        this.pasteTableBody.innerHTML = '';
+        data.forEach(row => {
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'spreadsheet-row';
+          
+          Object.values(row).forEach(cellValue => {
+            const cellDiv = document.createElement('div');
+            cellDiv.className = 'spreadsheet-cell';
+            cellDiv.textContent = cellValue;
+            rowDiv.appendChild(cellDiv);
+          });
+          this.pasteTableBody.appendChild(rowDiv);
+        });
+      }
+
+      /**
+       * Parses raw pasted CSV or tab-separated data into a structured format.
+       * @param {string} rawData The raw text data from the paste event.
        * @returns {Array<Object>} An array of structured transaction objects.
        * @throws {Error} Throws an error if the data is invalid.
        */
       parsePastedData(rawData) {
+        // Detect delimiter: tab for spreadsheet paste, comma for CSV
+        const delimiter = rawData.includes('\t') ? '\t' : ',';
         const lines = rawData.trim().split('\n');
         
-        // Split the first line to check for headers
-        const potentialHeaderLine = lines[0].split(',').map(h => h.trim().toLowerCase());
+        // Check for headers (common names like Date, Timestamp)
+        const potentialHeaderLine = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
         const hasHeader = potentialHeaderLine.includes('date(utc)') || potentialHeaderLine.includes('timestamp(utc)');
 
         // Map column names to a standard format
@@ -642,7 +610,7 @@
         const typesToCheck = ['COMMISSION', 'REALIZED_PNL', 'FUNDING_FEE', 'LIQUIDATION_FEE'];
 
         dataLines.forEach((line) => {
-          const values = line.split(',').map(v => v.trim());
+          const values = line.split(delimiter).map(v => v.trim());
           if (values.length < Object.keys(headers).length) return; // Skip incomplete lines
           
           const tx = {
@@ -675,6 +643,14 @@
        * @returns {Object} A structured summary of the data.
        */
       processAndRender(sheet) {
+        if (!sheet) {
+          sheet = this.extractDataFromTable();
+          if (!sheet || sheet.length === 0) {
+            this.handleError(new Error("No data to analyze. Please upload a file or paste data."));
+            return;
+          }
+        }
+        
         this.errorDiv.textContent = "";
         this.outputDiv.innerHTML = "";
         
@@ -700,6 +676,30 @@
         setTimeout(() => this.progressContainer.style.display = "none", 500);
       }
       
+      /**
+       * Extracts data from the HTML table cells.
+       * @returns {Array<Object>} An array of structured transaction objects.
+       */
+      extractDataFromTable() {
+        const rows = Array.from(this.pasteTableBody.querySelectorAll('.spreadsheet-row'));
+        if (rows.length === 0) return null;
+
+        const data = [];
+        rows.forEach(row => {
+          const cells = Array.from(row.querySelectorAll('.spreadsheet-cell'));
+          if (cells.some(cell => cell.textContent.trim() !== '')) {
+            data.push({
+              'Timestamp(UTC)': cells[0].textContent.trim(),
+              'Type': cells[1].textContent.trim(),
+              'Delta': parseFloat(cells[2].textContent.trim()),
+              'Asset': cells[3].textContent.trim(),
+              'Symbol': cells[4].textContent.trim(),
+            });
+          }
+        });
+        return data;
+      }
+
       /**
        * Handles and displays errors.
        * @param {Error} err The error object.
