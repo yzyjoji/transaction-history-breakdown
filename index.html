@@ -10,26 +10,26 @@
   <style>
     /*
      * A CSS file to define the look and feel of the Futures Transaction Analyzer.
-     * The theme is inspired by the Binance light mode with yellow and green accents.
+     * The theme has been reverted to a clean, light mode.
      */
 
     /* --- Global Variables & General Styling --- */
     :root {
-      --bg-color: #f5f5f5;
+      --bg-color: #f0f2f5;
       --card-bg: #ffffff;
       --text-color: #333333;
-      --primary-color: #fcd535;
-      --secondary-color: #666666;
-      --accent-positive: #00b578;
-      --accent-negative: #ff4655;
+      --primary-color: #007bff;
+      --secondary-color: #6c757d;
+      --accent-positive: #28a745;
+      --accent-negative: #dc3545;
       --border-color: #e0e0e0;
-      --shadow-light: rgba(0, 0, 0, 0.08);
-      --scrollbar-thumb: #ccc;
+      --shadow-light: rgba(0, 0, 0, 0.1);
+      --scrollbar-thumb: #b0b0b0;
       --scrollbar-track: #f0f0f0;
     }
 
     body {
-      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       margin: 0;
       padding: 20px;
       background: var(--bg-color);
@@ -104,28 +104,42 @@
       display: none;
     }
 
-    label.file-label {
+    label.file-label, .paste-btn {
       display: block;
       margin: 20px auto;
       padding: 12px 20px;
       border: 2px solid var(--primary-color);
       border-radius: 8px;
-      background-color: #fff9e6;
+      background-color: #e9f5ff;
       cursor: pointer;
       font-size: 1.1em;
       font-weight: 600;
       color: var(--primary-color);
       text-align: center;
       transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+    
+    .paste-btn {
+      width: 100%;
+      max-width: 300px;
+      border-color: var(--accent-positive);
+      background-color: #e6f7eb;
+      color: var(--accent-positive);
     }
 
     label.file-label:hover {
-      background-color: #fff4d6;
-      border-color: #e6c831;
+      background-color: #d1e7ff;
+      border-color: #0056b3;
       transform: translateY(-2px);
     }
     
+    .paste-btn:hover {
+      background-color: #d4edda;
+      border-color: #1e7e34;
+      transform: translateY(-2px);
+    }
+
     .wallet-input {
       display: flex;
       flex-direction: column;
@@ -142,7 +156,7 @@
       box-sizing: border-box;
       text-align: center;
       margin-top: 10px;
-      background: #f9f9f9;
+      background: #fdfdfd;
       color: var(--text-color);
       transition: all 0.2s ease;
     }
@@ -150,7 +164,39 @@
     .wallet-input input:focus {
       outline: none;
       border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(252, 213, 53, 0.2);
+      box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+    }
+    
+    .paste-area {
+      margin-top: 30px;
+      border-top: 1px solid var(--border-color);
+      padding-top: 20px;
+    }
+    
+    .paste-area h3 {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+    
+    .paste-area textarea {
+      width: 100%;
+      max-width: 800px;
+      min-height: 200px;
+      padding: 15px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: #fdfdfd;
+      color: var(--text-color);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.9em;
+      resize: vertical;
+      box-sizing: border-box;
+      transition: border-color 0.2s ease;
+    }
+    
+    .paste-area textarea:focus {
+      outline: none;
+      border-color: var(--accent-positive);
     }
 
     /* --- Progress Bar and Error Messages --- */
@@ -159,7 +205,7 @@
       width: 80%;
       max-width: 400px;
       margin: 15px auto;
-      background: #e0e0e0;
+      background: #e9ecef;
       height: 20px;
       border-radius: 10px;
       overflow: hidden;
@@ -207,11 +253,12 @@
       text-align: right;
       font-size: 0.95em;
       white-space: nowrap;
+      color: var(--text-color);
     }
     
     th {
-      background: var(--primary-color);
-      color: #333333;
+      background: #e9ecef;
+      color: var(--primary-color);
       font-weight: 600;
       text-align: center;
       cursor: help;
@@ -222,7 +269,7 @@
     }
 
     tbody tr:hover {
-      background-color: #fcf6d7;
+      background-color: #f8f9fa;
     }
     
     thead th:first-child { border-top-left-radius: 8px; }
@@ -230,7 +277,7 @@
     
     tbody tr:last-child {
       font-weight: bold;
-      background: #f0f0f0;
+      background: #e9ecef;
       border-top: 2px solid var(--secondary-color);
     }
     
@@ -322,6 +369,13 @@
     </div>
     <input type="file" id="fileInput" accept=".xlsx, .csv" />
     <label for="fileInput" class="file-label">Upload Your Transaction History File</label>
+    
+    <div class="paste-area">
+      <h3>Or, Paste Your CSV Data Below</h3>
+      <textarea id="pasteData" placeholder="Paste your transaction data here..."></textarea>
+      <button class="paste-btn" id="pasteBtn">Analyze Pasted Data</button>
+    </div>
+    
     <div id="progressContainer"><div id="progressBar"></div></div>
     <div id="error" class="error"></div>
   </div>
@@ -338,6 +392,8 @@
       constructor() {
         // Cache DOM elements for efficient access
         this.fileInput = document.getElementById("fileInput");
+        this.pasteDataArea = document.getElementById("pasteData");
+        this.pasteBtn = document.getElementById("pasteBtn");
         this.homepage = document.getElementById("homepage");
         this.outputSection = document.getElementById("output-section");
         this.errorDiv = document.getElementById("error");
@@ -348,6 +404,7 @@
 
         // Bind event listeners to the class instance
         this.fileInput.addEventListener("change", this.handleFile.bind(this));
+        this.pasteBtn.addEventListener("click", this.handlePastedData.bind(this));
         
         // Expose a public method for the pie charts to use
         window.scrollToSymbol = this.scrollToSymbol.bind(this);
@@ -359,18 +416,7 @@
        */
       async handleFile(event) {
         const file = event.target.files[0];
-        this.errorDiv.textContent = "";
-        this.outputDiv.innerHTML = "";
-
-        const initialBalance = parseFloat(this.initialBalanceInput.value);
-        if (isNaN(initialBalance)) {
-          this.errorDiv.textContent = "Please enter a valid initial balance.";
-          return;
-        }
-
-        this.homepage.style.display = 'none';
-        this.outputSection.style.display = 'block';
-
+        
         const fileExtension = file.name.split('.').pop().toLowerCase();
         if (fileExtension !== 'xlsx' && fileExtension !== 'csv') {
           this.errorDiv.textContent = "Please upload a valid XLSX or CSV file.";
@@ -382,25 +428,73 @@
         try {
           this.showProgress(0);
           const sheet = await this.readFileAsync(file);
-
-          if (sheet.length === 0) {
-            throw new Error("No data found in sheet.");
-          }
-
-          this.showProgress(75);
-          const summary = this.processData(sheet, initialBalance);
-          this.renderOutput(summary);
-
-          this.showProgress(100);
-          setTimeout(() => this.progressContainer.style.display = "none", 500);
-
+          this.processAndRender(sheet);
         } catch (err) {
-          console.error(err);
-          this.errorDiv.textContent = `Error: ${err.message}. Please ensure it's a valid transaction history file.`;
-          this.progressContainer.style.display = "none";
-          this.homepage.style.display = 'block';
-          this.outputSection.style.display = 'none';
+          this.handleError(err);
         }
+      }
+      
+      /**
+       * Handler for the paste button click event.
+       */
+      handlePastedData() {
+        const data = this.pasteDataArea.value.trim();
+        if (!data) {
+          this.errorDiv.textContent = "Please paste some data to analyze.";
+          return;
+        }
+        
+        try {
+          this.showProgress(0);
+          const workbook = XLSX.read(data, { type: "string" });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
+          this.processAndRender(sheet);
+        } catch (err) {
+          this.handleError(err);
+        }
+      }
+
+      /**
+       * Processes the sheet data and renders the output.
+       * @param {Array<Object>} sheet The array of transaction objects.
+       */
+      processAndRender(sheet) {
+        this.errorDiv.textContent = "";
+        this.outputDiv.innerHTML = "";
+        
+        const initialBalance = parseFloat(this.initialBalanceInput.value);
+        if (isNaN(initialBalance)) {
+          this.errorDiv.textContent = "Please enter a valid initial balance.";
+          return;
+        }
+
+        this.homepage.style.display = 'none';
+        this.outputSection.style.display = 'block';
+        
+        if (sheet.length === 0) {
+            this.handleError(new Error("No data found in sheet."));
+            return;
+        }
+        
+        this.showProgress(75);
+        const summary = this.processData(sheet, initialBalance);
+        this.renderOutput(summary);
+        
+        this.showProgress(100);
+        setTimeout(() => this.progressContainer.style.display = "none", 500);
+      }
+      
+      /**
+       * Handles and displays errors.
+       * @param {Error} err The error object.
+       */
+      handleError(err) {
+        console.error(err);
+        this.errorDiv.textContent = `Error: ${err.message}. Please ensure the data format is correct.`;
+        this.progressContainer.style.display = "none";
+        this.homepage.style.display = 'block';
+        this.outputSection.style.display = 'none';
       }
 
       /**
@@ -552,7 +646,7 @@
                     <td>${values.liquidation.toFixed(2)}</td>
                   </tr>
                 `).join('')}
-                <tr style="font-weight:bold;background:#f0f0f0;">
+                <tr style="font-weight:bold;background:#e9ecef;">
                   <td>Grand Total</td>
                   <td>${grandTotals.tradingFees.toFixed(2)}</td>
                   <td>${grandTotals.profitAndLoss.toFixed(2)}</td>
@@ -562,8 +656,8 @@
               </tbody>
             </table>
           </div>
-          <h2>Fees vs. PnL per Symbol</h2>
-          <div class="pie-chart-container" id="pie-charts"></div>
+          <h2>Detailed Breakdown by Symbol</h2>
+          <div class="pie-chart-container" id="symbol-pie-charts"></div>
           <h2>Transfer Summary</h2>
           <div class="table-container">
             <table>
@@ -587,7 +681,7 @@
         this.renderBarChart(totalFees, totalPnL);
         this.renderLineChart(summary.timeseries);
         this.renderWalletChart(summary.timeseries);
-        this.renderPieCharts(summary.perSymbol);
+        this.renderSymbolPieCharts(summary.perSymbol);
       }
 
       /**
@@ -777,64 +871,83 @@
       }
 
       /**
-       * Renders individual pie charts for each trading symbol.
-       * @param {Object} perSymbol The summary data per symbol.
+       * Renders a pie chart for each symbol.
+       * @param {Object} perSymbolData The object containing data for each symbol.
        */
-      renderPieCharts(perSymbol) {
-        const pieChartContainer = document.getElementById('pie-charts');
-        for (const symbol in perSymbol) {
-          const values = perSymbol[symbol];
-          const totalFees = Math.abs(values.tradingFees) + Math.abs(values.fundingFees) + Math.abs(values.liquidation);
-          const totalPnL = values.profitAndLoss;
-          
-          if (totalFees !== 0 || totalPnL !== 0) {
-            const chartItem = document.createElement('div');
-            chartItem.className = 'pie-chart-item';
-            chartItem.innerHTML = `<h4 style="text-align: center; color: var(--secondary-color);">${symbol}</h4><canvas id="pieChart-${symbol}" onclick="scrollToSymbol('${symbol}')"></canvas>`;
-            pieChartContainer.appendChild(chartItem);
+      renderSymbolPieCharts(perSymbolData) {
+        const container = document.getElementById('symbol-pie-charts');
+        const colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6c757d', '#17a2b8', '#fd7e14'];
+        
+        for (const [symbol, values] of Object.entries(perSymbolData)) {
+          // Filter out symbols with no relevant data (only transfers)
+          if (Object.values(values).every(val => val === 0)) continue;
 
-            const ctxPie = document.getElementById(`pieChart-${symbol}`).getContext('2d');
-            new Chart(ctxPie, {
-              type: 'pie',
-              data: {
-                labels: ['Total Fees', 'Total P&L'],
-                datasets: [{
-                  data: [totalFees, totalPnL],
-                  backgroundColor: ['#5bc0de', '#5cb85c'],
-                  borderColor: ['var(--bg-color)', 'var(--bg-color)'],
-                  borderWidth: 2,
-                }]
-              },
-              options: {
-                responsive: true,
-                plugins: {
-                  legend: { position: 'top', labels: { color: 'var(--text-color)' } },
-                  datalabels: {
+          // Create a new div and canvas for each chart
+          const chartWrapper = document.createElement('div');
+          chartWrapper.className = 'pie-chart-item';
+          
+          const chartTitle = document.createElement('h4');
+          chartTitle.textContent = `${symbol}`;
+          
+          const canvas = document.createElement('canvas');
+          canvas.id = `pieChart-${symbol}`;
+          canvas.width = 250;
+          canvas.height = 250;
+          
+          chartWrapper.appendChild(chartTitle);
+          chartWrapper.appendChild(canvas);
+          container.appendChild(chartWrapper);
+
+          const ctx = canvas.getContext('2d');
+          const data = [
+            values.profitAndLoss,
+            Math.abs(values.tradingFees),
+            Math.abs(values.fundingFees),
+            Math.abs(values.liquidation)
+          ];
+          
+          const labels = ['Profit & Loss', 'Trading Fees', 'Funding Fees', 'Liquidation Fees'];
+          
+          new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: labels,
+              datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderColor: 'var(--card-bg)',
+                borderWidth: 2,
+              }]
+            },
+            options: {
+              responsive: true,
+              cutout: '60%',
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: {
                     color: 'var(--text-color)',
-                    formatter: (value, context) => {
+                    boxWidth: 15,
+                    font: { size: 12 }
+                  }
+                },
+                title: {
+                  display: false,
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (context) => {
+                      const label = context.label || '';
+                      const value = context.parsed || 0;
                       const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
-                      const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
-                      return percentage + '%';
-                    },
-                    font: { weight: 'bold' }
-                  },
-                  title: { display: false },
-                  tooltip: {
-                    callbacks: {
-                      label: (context) => {
-                        const label = context.label || '';
-                        const value = context.parsed || 0;
-                        const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
-                        const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
-                        return `${label}: ${value.toFixed(2)} USDT (${percentage}%)`;
-                      }
+                      const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
+                      return `${label}: ${value.toFixed(2)} USDT (${percentage}%)`;
                     }
                   }
                 }
-              },
-              plugins: [ChartDataLabels]
-            });
-          }
+              }
+            }
+          });
         }
       }
       
