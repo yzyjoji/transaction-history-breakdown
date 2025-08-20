@@ -57,7 +57,6 @@
       margin-top: 30px;
       margin-bottom: 15px;
       color: var(--secondary-color);
-      font-size: 1.8em;
       border-bottom: 1px solid var(--border-color);
       padding-bottom: 8px;
     }
@@ -104,7 +103,7 @@
       display: none;
     }
 
-    label.file-label, .paste-btn {
+    label.file-label, .paste-btn, .analyze-btn, .action-btn {
       display: block;
       margin: 20px auto;
       padding: 12px 20px;
@@ -120,12 +119,19 @@
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
     }
     
-    .paste-btn {
+    .paste-btn, .analyze-btn {
       width: 100%;
       max-width: 300px;
       border-color: var(--accent-positive);
       background-color: #e6f7eb;
       color: var(--accent-positive);
+    }
+    
+    .action-btn {
+      max-width: 300px;
+      border-color: #f7a938;
+      background-color: #fcefd4;
+      color: #f7a938;
     }
 
     label.file-label:hover {
@@ -134,12 +140,18 @@
       transform: translateY(-2px);
     }
     
-    .paste-btn:hover {
+    .paste-btn:hover, .analyze-btn:hover {
       background-color: #d4edda;
       border-color: #1e7e34;
       transform: translateY(-2px);
     }
-
+    
+    .action-btn:hover {
+      background-color: #fbdca8;
+      border-color: #d18d2b;
+      transform: translateY(-2px);
+    }
+    
     .wallet-input {
       display: flex;
       flex-direction: column;
@@ -337,7 +349,7 @@
     #output-section {
         display: none;
     }
-    
+
   </style>
 </head>
 <body>
@@ -401,6 +413,11 @@
         this.progressContainer = document.getElementById("progressContainer");
         this.progressBar = document.getElementById("progressBar");
         this.initialBalanceInput = document.getElementById("initialBalance");
+        
+        this.parsedData = null; // Property to hold parsed data for later use
+
+        // Known transaction types for parsing logic
+        this.knownTypes = ['COMMISSION', 'REALIZED_PNL', 'FUNDING_FEE', 'LIQUIDATION_FEE', 'TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD'];
 
         // Bind event listeners to the class instance
         this.fileInput.addEventListener("change", this.handleFile.bind(this));
@@ -446,14 +463,106 @@
         
         try {
           this.showProgress(0);
-          const workbook = XLSX.read(data, { type: "string" });
-          const sheetName = workbook.SheetNames[0];
-          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
-          this.processAndRender(sheet);
+          this.parsedData = this.parsePastedData(data);
+          this.showParsedDataTable(this.parsedData);
         } catch (err) {
           this.handleError(err);
         }
       }
+
+      /**
+       * Renders a table of the parsed data for user confirmation.
+       * @param {Array<Object>} data The parsed transaction data.
+       */
+      showParsedDataTable(data) {
+        this.homepage.style.display = 'none';
+        this.outputSection.style.display = 'block';
+        this.outputDiv.innerHTML = `
+          <h2>Data Preview</h2>
+          <p>Please review the data below to ensure it was parsed correctly. If it looks good, click "Analyze".</p>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date(UTC)</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Asset</th>
+                  <th>Symbol</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${data.map(row => `
+                  <tr>
+                    <td>${row['Date(UTC)']}</td>
+                    <td>${row['Type']}</td>
+                    <td>${row['Amount'].toFixed(8)}</td>
+                    <td>${row['Asset']}</td>
+                    <td>${row['symbol']}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          <button id="analyzeDataBtn" class="analyze-btn">Analyze My Transactions</button>
+        `;
+        document.getElementById("analyzeDataBtn").addEventListener("click", () => {
+          this.processAndRender(this.parsedData);
+        });
+        
+        this.showProgress(10);
+        setTimeout(() => this.progressContainer.style.display = "none", 500);
+      }
+      
+      /**
+       * Parses raw pasted CSV data into a structured format and validates it.
+       * @param {string} rawData The raw CSV text data from the paste area.
+       * @returns {Array<Object>} An array of structured transaction objects.
+       * @throws {Error} Throws an error if the data is invalid.
+       */
+      parsePastedData(rawData) {
+        const lines = rawData.trim().split('\n');
+        if (lines.length <= 1) {
+          throw new Error("No data found in pasted content. Please ensure you've copied the CSV data correctly, including the header.");
+        }
+
+        const headerLine = lines[0].split(',').map(h => h.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_'));
+        const headers = {
+          date: headerLine.indexOf('DATE_UTC'),
+          type: headerLine.indexOf('TYPE'),
+          amount: headerLine.indexOf('AMOUNT'),
+          asset: headerLine.indexOf('ASSET'),
+          symbol: headerLine.indexOf('SYMBOL'),
+        };
+
+        const transactions = [];
+        const typesToCheck = ['COMMISSION', 'REALIZED_PNL', 'FUNDING_FEE', 'LIQUIDATION_FEE'];
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim());
+          const tx = {
+            'Date(UTC)': values[headers.date] || '',
+            'Type': values[headers.type] || 'UNKNOWN',
+            'Amount': parseFloat(values[headers.amount]) || 0,
+            'Asset': values[headers.asset] || 'USDT',
+            'symbol': values[headers.symbol] || '--',
+          };
+          
+          // Validation step: Check if financial transaction types have a valid number.
+          if (typesToCheck.includes(tx['Type']) && isNaN(tx['Amount'])) {
+              throw new Error(`Invalid or missing amount for transaction type: ${tx['Type']} on date: ${tx['Date(UTC)']}`);
+          }
+          
+          transactions.push(tx);
+        }
+
+        if (transactions.length === 0) {
+            throw new Error("Pasted data could not be parsed. Please check the format.");
+        }
+
+        return transactions;
+      }
+
 
       /**
        * Processes the sheet data and renders the output.
@@ -465,7 +574,7 @@
         
         const initialBalance = parseFloat(this.initialBalanceInput.value);
         if (isNaN(initialBalance)) {
-          this.errorDiv.textContent = "Please enter a valid initial balance.";
+          this.handleError(new Error("Please enter a valid initial balance."));
           return;
         }
 
@@ -478,8 +587,8 @@
         }
         
         this.showProgress(75);
-        const summary = this.processData(sheet, initialBalance);
-        this.renderOutput(summary);
+        const tradingSummary = this.processData(sheet, initialBalance);
+        this.renderOutput(tradingSummary);
         
         this.showProgress(100);
         setTimeout(() => this.progressContainer.style.display = "none", 500);
@@ -970,3 +1079,4 @@
   </script>
 </body>
 </html>
+
