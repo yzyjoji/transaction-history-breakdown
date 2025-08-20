@@ -484,9 +484,9 @@
             <table>
               <thead>
                 <tr>
-                  <th>Date(UTC)</th>
+                  <th>Timestamp(UTC)</th>
                   <th>Type</th>
-                  <th>Amount</th>
+                  <th>Delta</th>
                   <th>Asset</th>
                   <th>Symbol</th>
                 </tr>
@@ -494,11 +494,11 @@
               <tbody>
                 ${data.map(row => `
                   <tr>
-                    <td>${row['Date(UTC)']}</td>
+                    <td>${row['Timestamp(UTC)']}</td>
                     <td>${row['Type']}</td>
-                    <td>${row['Amount'].toFixed(8)}</td>
+                    <td>${row['Delta'].toFixed(8)}</td>
                     <td>${row['Asset']}</td>
-                    <td>${row['symbol']}</td>
+                    <td>${row['Symbol']}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -526,14 +526,19 @@
           throw new Error("No data found in pasted content. Please ensure you've copied the CSV data correctly, including the header.");
         }
 
-        const headerLine = lines[0].split(',').map(h => h.trim().toUpperCase().replace(/[^A-Z0-9]/g, '_'));
+        const headerLine = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z0-9]/g, ''));
         const headers = {
-          date: headerLine.indexOf('DATE_UTC'),
-          type: headerLine.indexOf('TYPE'),
-          amount: headerLine.indexOf('AMOUNT'),
-          asset: headerLine.indexOf('ASSET'),
-          symbol: headerLine.indexOf('SYMBOL'),
+          date: headerLine.indexOf('timestamputc'),
+          type: headerLine.indexOf('type'),
+          amount: headerLine.indexOf('amount') > -1 ? headerLine.indexOf('amount') : headerLine.indexOf('delta'),
+          asset: headerLine.indexOf('asset'),
+          symbol: headerLine.indexOf('symbol'),
         };
+        
+        // Ensure required columns are present
+        if (headers.date === -1 || headers.type === -1 || headers.amount === -1 || headers.symbol === -1) {
+            throw new Error("Missing one or more required columns: 'Timestamp(UTC)', 'Type', 'Amount' or 'Delta', 'Symbol'.");
+        }
 
         const transactions = [];
         const typesToCheck = ['COMMISSION', 'REALIZED_PNL', 'FUNDING_FEE', 'LIQUIDATION_FEE'];
@@ -541,16 +546,16 @@
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',').map(v => v.trim());
           const tx = {
-            'Date(UTC)': values[headers.date] || '',
-            'Type': values[headers.type] || 'UNKNOWN',
-            'Amount': parseFloat(values[headers.amount]) || 0,
+            'Timestamp(UTC)': values[headers.date] || '',
+            'Type': values[headers.type] ? values[headers.type].toUpperCase().replace(/\s/g, '_') : 'UNKNOWN',
+            'Delta': parseFloat(values[headers.amount]) || 0,
             'Asset': values[headers.asset] || 'USDT',
-            'symbol': values[headers.symbol] || '--',
+            'Symbol': values[headers.symbol] || '--',
           };
           
           // Validation step: Check if financial transaction types have a valid number.
-          if (typesToCheck.includes(tx['Type']) && isNaN(tx['Amount'])) {
-              throw new Error(`Invalid or missing amount for transaction type: ${tx['Type']} on date: ${tx['Date(UTC)']}`);
+          if (typesToCheck.includes(tx['Type']) && isNaN(tx['Delta'])) {
+              throw new Error(`Invalid or missing 'Delta' value for transaction type: ${tx['Type']} on date: ${tx['Timestamp(UTC)']}`);
           }
           
           transactions.push(tx);
@@ -661,20 +666,40 @@
           'TRANSFER': 'transfer', 'STRATEGY_UMFUTURES_TRANSFER': 'transfer',
           'BFUSD_REWARD': 'tradingFees'
         };
+        
+        const columnMap = {
+          'Date(UTC)': ['Date(UTC)', 'Timestamp(UTC)'],
+          'Amount': ['Amount', 'Delta'],
+          'Type': ['Type'],
+          'Symbol': ['symbol', 'Symbol']
+        };
+        
+        const findColumn = (row, potentialNames) => {
+            const keys = Object.keys(row);
+            for (const name of potentialNames) {
+                for (const key of keys) {
+                    if (key.toLowerCase().includes(name.toLowerCase())) {
+                        return key;
+                    }
+                }
+            }
+            return null;
+        };
 
-        const sortedSheet = sheet.sort((a, b) => new Date(a['Date(UTC)']) - new Date(b['Date(UTC)']));
+        const sortedSheet = sheet.sort((a, b) => {
+            const dateA = new Date(a[findColumn(a, columnMap['Date(UTC)'])]);
+            const dateB = new Date(b[findColumn(b, columnMap['Date(UTC)'])]);
+            return dateA - dateB;
+        });
+
         let cumulativePnL = 0;
         let cumulativeFees = 0;
         let cumulativeWalletBalance = initialBalance;
 
         sortedSheet.forEach((row) => {
-          const normalizedRow = Object.fromEntries(
-            Object.entries(row).map(([k, v]) => [k.toString().trim().toUpperCase(), v])
-          );
-          
-          const symbol = normalizedRow["SYMBOL"] || "--";
-          const type = normalizedRow["TYPE"] || "UNKNOWN";
-          const amount = Number(normalizedRow["AMOUNT"] || 0);
+          const type = row[findColumn(row, columnMap.Type)] ? row[findColumn(row, columnMap.Type)].toUpperCase().replace(/\s/g, '_') : 'UNKNOWN';
+          const amount = Number(row[findColumn(row, columnMap.Amount)] || 0);
+          const symbol = row[findColumn(row, columnMap.Symbol)] || "--";
 
           if (!summary.perSymbol[symbol]) {
             summary.perSymbol[symbol] = { tradingFees: 0, profitAndLoss: 0, fundingFees: 0, liquidation: 0 };
@@ -694,18 +719,20 @@
             }
           }
 
-          const fees = Math.abs(normalizedRow['TYPE'] === 'COMMISSION' ? amount : 0) +
-                       Math.abs(normalizedRow['TYPE'] === 'FUNDING_FEE' ? amount : 0) +
-                       Math.abs(normalizedRow['TYPE'] === 'LIQUIDATION_FEE' ? amount : 0);
-          const pnl = normalizedRow['TYPE'] === 'REALIZED_PNL' ? amount : 0;
+          const fees = Math.abs(type === 'COMMISSION' ? amount : 0) +
+                       Math.abs(type === 'FUNDING_FEE' ? amount : 0) +
+                       Math.abs(type === 'LIQUIDATION_FEE' ? amount : 0);
+          const pnl = type === 'REALIZED_PNL' ? amount : 0;
           cumulativePnL += pnl;
           cumulativeFees += fees;
           
+          cumulativeWalletBalance += amount;
+          
           summary.timeseries.push({
-            date: new Date(normalizedRow['DATE(UTC)']),
+            date: new Date(row[findColumn(row, columnMap['Date(UTC)'])].toString()),
             pnl: cumulativePnL,
             fees: cumulativeFees,
-            walletBalance: initialBalance + cumulativePnL + cumulativeFees
+            walletBalance: cumulativeWalletBalance
           });
         });
         return summary;
