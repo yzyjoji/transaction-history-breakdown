@@ -1,1209 +1,642 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Futures Transaction Analyzer</title>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
-  <style>
-    /*
-     * This CSS file has been updated to style the new table-like paste area.
-     * The theme is a clean, modern, and light mode.
-     */
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction History Summary</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- html2canvas and jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Chart.js for the pie charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- XLSX for reading Excel files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    /* --- Global Variables & General Styling --- */
-    :root {
-      --bg-color: #f0f2f5;
-      --card-bg: #ffffff;
-      --text-color: #333333;
-      --primary-color: #007bff;
-      --secondary-color: #6c757d;
-      --accent-positive: #28a745;
-      --accent-negative: #dc3545;
-      --border-color: #e0e0e0;
-      --shadow-light: rgba(0, 0, 0, 0.1);
-      --scrollbar-thumb: #b0b0b0;
-      --scrollbar-track: #f0f0f0;
-      --table-header-bg: #e9ecef;
-    }
-
-    body {
-      font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: var(--bg-color);
-      color: var(--text-color);
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    h1, h2, h3, h4 {
-      color: var(--text-color);
-      margin: 0;
-      padding: 0;
-    }
-    
-    h1 {
-      margin-bottom: 20px;
-      color: var(--primary-color);
-      text-align: center;
-      font-size: 2.2em;
-      letter-spacing: 1px;
-    }
-
-    h2 {
-      text-align: center;
-      margin-top: 30px;
-      margin-bottom: 15px;
-      color: var(--secondary-color);
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 8px;
-    }
-
-    /* --- Container & Card Styling --- */
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 20px;
-      background: var(--card-bg);
-      border-radius: 12px;
-      box-shadow: 0 4px 15px var(--shadow-light);
-      text-align: center;
-      transition: all 0.3s ease-in-out;
-    }
-
-    .intro-text, .fee-description {
-      margin-bottom: 25px;
-      text-align: left;
-    }
-
-    .fee-description ul {
-      list-style-type: none;
-      padding: 0;
-    }
-
-    .fee-description li {
-      margin-bottom: 10px;
-      padding-left: 1.5em;
-      position: relative;
-    }
-
-    .fee-description li:before {
-      content: '•';
-      position: absolute;
-      left: 0;
-      color: var(--primary-color);
-      font-weight: bold;
-      font-size: 1.2em;
-    }
-
-    /* --- Input and Button Styling --- */
-    input[type="file"] {
-      display: none;
-    }
-
-    label.file-label, .analyze-btn {
-      display: block;
-      margin: 20px auto;
-      padding: 12px 20px;
-      border: 2px solid var(--primary-color);
-      border-radius: 8px;
-      background-color: #e9f5ff;
-      cursor: pointer;
-      font-size: 1.1em;
-      font-weight: 600;
-      color: var(--primary-color);
-      text-align: center;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    }
-    
-    .analyze-btn {
-      max-width: 300px;
-      border-color: var(--accent-positive);
-      background-color: #e6f7eb;
-      color: var(--accent-positive);
-    }
-
-    label.file-label:hover {
-      background-color: #d1e7ff;
-      border-color: #0056b3;
-      transform: translateY(-2px);
-    }
-    
-    .analyze-btn:hover {
-      background-color: #d4edda;
-      border-color: #1e7e34;
-      transform: translateY(-2px);
-    }
-    
-    .wallet-input {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .wallet-input input {
-      padding: 10px;
-      border: 1px solid var(--border-color);
-      border-radius: 5px;
-      width: 100%;
-      max-width: 250px;
-      box-sizing: border-box;
-      text-align: center;
-      margin-top: 10px;
-      background: #fdfdfd;
-      color: var(--text-color);
-      transition: all 0.2s ease;
-    }
-
-    .wallet-input input:focus {
-      outline: none;
-      border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
-    }
-    
-    /* --- Spreadsheet-like Paste Area --- */
-    .paste-area {
-      margin-top: 30px;
-      border-top: 1px solid var(--border-color);
-      padding-top: 20px;
-    }
-
-    .paste-area h3 {
-      text-align: center;
-      margin-bottom: 15px;
-    }
-
-    .spreadsheet-container {
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      overflow: hidden;
-      width: 100%;
-      max-width: 1000px;
-      margin: 0 auto 20px auto;
-      background: var(--card-bg);
-      box-shadow: 0 2px 8px var(--shadow-light);
-    }
-
-    .spreadsheet-header {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      background: var(--table-header-bg);
-      font-weight: bold;
-      border-bottom: 1px solid var(--border-color);
-      text-align: center;
-    }
-
-    .spreadsheet-header .header-cell {
-      padding: 10px;
-      border-right: 1px solid var(--border-color);
-      cursor: help;
-    }
-
-    .spreadsheet-header .header-cell:last-child {
-      border-right: none;
-    }
-
-    .spreadsheet-body {
-      overflow-y: auto;
-      max-height: 400px;
-    }
-    
-    .spreadsheet-row {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .spreadsheet-row:last-child {
-      border-bottom: none;
-    }
-
-    .spreadsheet-cell {
-      padding: 10px;
-      border-right: 1px solid var(--border-color);
-      min-height: 38px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      text-align: center;
-      background: #fdfdfd;
-    }
-
-    .spreadsheet-cell:last-child {
-      border-right: none;
-    }
-    
-    .spreadsheet-cell[contenteditable="true"] {
-      cursor: text;
-    }
-
-    /* --- Progress Bar and Error Messages --- */
-    #progressContainer {
-      display: none;
-      width: 80%;
-      max-width: 400px;
-      margin: 15px auto;
-      background: #e9ecef;
-      height: 20px;
-      border-radius: 10px;
-      overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
-    }
-    
-    #progressBar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(to right, var(--accent-positive), #00a06c);
-      transition: width 0.4s ease-out;
-      border-radius: 10px;
-      text-align: center;
-      color: white;
-      line-height: 20px;
-      font-size: 0.8em;
-    }
-
-    .error {
-      color: var(--accent-negative);
-      margin-top: 10px;
-      text-align: center;
-      font-weight: bold;
-    }
-    
-    /* --- Table Styling for Output --- */
-    .table-container {
-      overflow-x: auto;
-      margin-top: 20px;
-      border-radius: 8px;
-    }
-    
-    table {
-      width: 100%;
-      min-width: 500px;
-      border-collapse: collapse;
-      background: var(--card-bg);
-      margin-bottom: 20px;
-      border-radius: 8px;
-    }
-    
-    th, td {
-      border: 1px solid var(--border-color);
-      padding: 10px 15px;
-      text-align: right;
-      font-size: 0.95em;
-      white-space: nowrap;
-      color: var(--text-color);
-    }
-    
-    th {
-      background: #e9ecef;
-      color: var(--primary-color);
-      font-weight: 600;
-      text-align: center;
-      cursor: help;
-    }
-
-    tbody tr {
-      transition: background-color 0.3s ease;
-    }
-
-    tbody tr:hover {
-      background-color: #f8f9fa;
-    }
-    
-    thead th:first-child { border-top-left-radius: 8px; }
-    thead th:last-child { border-top-right-radius: 8px; }
-    
-    tbody tr:last-child {
-      font-weight: bold;
-      background: #e9ecef;
-      border-top: 2px solid var(--secondary-color);
-    }
-    
-    /* --- Chart Styling --- */
-    .chart-container {
-      width: 100%;
-      max-width: 700px;
-      margin: 40px auto;
-      background: var(--card-bg);
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px var(--shadow-light);
-    }
-
-    .pie-chart-container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
-      margin-top: 20px;
-    }
-
-    .pie-chart-item {
-        width: 100%;
-        max-width: 250px;
-        background: var(--card-bg);
-        padding: 15px;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px var(--shadow-light);
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .pie-chart-item:hover {
-        transform: translateY(-5px);
-    }
-
-    .pie-chart-item canvas {
-        cursor: pointer;
-    }
-    
-    /* --- Scrollbar Styling for Webkit Browsers --- */
-    ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: var(--scrollbar-thumb);
-        border-radius: 10px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: var(--scrollbar-track);
-    }
-    
-    /* --- Visibility for output section --- */
-    #output-section {
-        display: none;
-    }
-
-  </style>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .grid-cell-input {
+            transition: all 0.2s ease-in-out;
+            outline: none;
+        }
+        .grid-cell-input:focus {
+            z-index: 10;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+            border-color: #3b82f6;
+        }
+    </style>
 </head>
-<body>
-  <h1>Futures Transaction Analyzer</h1>
-  <div class="container" id="homepage">
-    <div class="intro-text">
-      <p>This page is designed to help you analyze your Binance Futures transaction history. By uploading your exported `.xlsx` or `.csv` file, you can get a clear overview of your trading activity, including a breakdown of your fees and profit and loss over time.</p>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-8">
+    <div id="app" class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-blue-600 dark:text-blue-400 mb-2">
+                Transaction History Summary
+            </h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300">
+                Paste or upload your transaction data to get a breakdown by symbol.
+            </p>
+        </header>
+
+        <!-- Main content will be rendered here by JavaScript -->
+        <div id="root"></div>
     </div>
-    <div class="fee-description">
-      <h2>Understanding Your Fees</h2>
-      <ul>
-        <li>
-          <h3>Trading Fees</h3>
-          <p>These are the fees you pay for executing trades. They are calculated based on your trade size and whether you are a **maker** (placing a limit order that adds liquidity to the market) or a **taker** (placing a market order that immediately fills against an existing order). Taker fees are typically higher than maker fees.</p>
-        </li>
-        <li>
-          <h3>Funding Fees</h3>
-          <p>Funding fees are periodic payments exchanged between long and short traders. They ensure the perpetual contract price stays close to the underlying asset's price. Depending on market conditions, you may either pay or receive funding fees.</p>
-        </li>
-        <li>
-          <h3>Liquidation Fees</h3>
-          <p>A liquidation fee is a penalty incurred when a leveraged position is automatically closed by the exchange. This happens when your margin balance falls below the required maintenance margin level, usually due to a sudden market move against your position.</p>
-        </li>
-      </ul>
-    </div>
-    <div class="wallet-input">
-      <label for="initialBalance">Enter your initial wallet balance (in USDT)</label>
-      <input type="number" id="initialBalance" placeholder="e.g., 1000.00" value="0" />
-    </div>
-    <input type="file" id="fileInput" accept=".xlsx, .csv" />
-    <label for="fileInput" class="file-label">Upload Your Transaction History File</label>
-    
-    <div class="paste-area">
-      <h3>Or, Paste Your CSV Data Below</h3>
-      <p>Simply click the first cell and paste your data directly into the table. The values will automatically fill in the columns.</p>
-      <div class="spreadsheet-container">
-        <div class="spreadsheet-header">
-          <div class="header-cell" title="The date and time of the transaction (e.g., 2025-08-18 22:45:21).">Timestamp(UTC)</div>
-          <div class="header-cell" title="The type of transaction (e.g., COMMISSION, REALIZED_PNL).">Type</div>
-          <div class="header-cell" title="The amount of the transaction, which can be positive or negative.">Amount</div>
-          <div class="header-cell" title="The asset type (e.g., USDT).">Asset</div>
-          <div class="header-cell" title="The trading pair or symbol (e.g., XRPUSDT).">Symbol</div>
-        </div>
-        <div class="spreadsheet-body" id="pasteTableBody" contenteditable="true">
-          <!-- Default empty rows -->
-          <div class="spreadsheet-row">
-            <div class="spreadsheet-cell"></div>
-            <div class="spreadsheet-cell"></div>
-            <div class="spreadsheet-cell"></div>
-            <div class="spreadsheet-cell"></div>
-            <div class="spreadsheet-cell"></div>
-          </div>
-        </div>
-      </div>
-      <button class="analyze-btn" id="analyzeDataBtn">Analyze My Transactions</button>
-    </div>
-    
-    <div id="progressContainer"><div id="progressBar"></div></div>
-    <div id="error" class="error"></div>
-  </div>
-  <div class="container" id="output-section">
-    <div id="output"></div>
-  </div>
 
-  <script>
-    /**
-     * The main application class to handle file processing, data analysis, and UI rendering.
-     * This modular approach improves code organization and readability.
-     */
-    class App {
-      constructor() {
-        // Cache DOM elements for efficient access
-        this.fileInput = document.getElementById("fileInput");
-        this.pasteTableBody = document.getElementById("pasteTableBody");
-        this.analyzeDataBtn = document.getElementById("analyzeDataBtn");
-        this.homepage = document.getElementById("homepage");
-        this.outputSection = document.getElementById("output-section");
-        this.errorDiv = document.getElementById("error");
-        this.outputDiv = document.getElementById("output");
-        this.progressContainer = document.getElementById("progressContainer");
-        this.progressBar = document.getElementById("progressBar");
-        this.initialBalanceInput = document.getElementById("initialBalance");
-        
-        this.parsedData = null; // Property to hold parsed data for later use
+    <script>
+        const { jsPDF } = window.jspdf;
+        const root = document.getElementById('root');
 
-        // Known transaction types for parsing logic
-        this.knownTypes = ['COMMISSION', 'REALIZED_PNL', 'FUNDING_FEE', 'LIQUIDATION_FEE', 'TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD'];
-
-        // Bind event listeners to the class instance
-        this.fileInput.addEventListener("change", this.handleFile.bind(this));
-        this.pasteTableBody.addEventListener('paste', this.handlePastedData.bind(this));
-        this.analyzeDataBtn.addEventListener('click', this.processAndRender.bind(this));
-        
-        // Expose a public method for the pie charts to use
-        window.scrollToSymbol = this.scrollToSymbol.bind(this);
-      }
-
-      /**
-       * Main handler for the file input change event.
-       * @param {Event} event The file input change event.
-       */
-      async handleFile(event) {
-        const file = event.target.files[0];
-        
-        const fileExtension = file.name.split('.').pop().toLowerCase();
-        if (fileExtension !== 'xlsx' && fileExtension !== 'csv') {
-          this.errorDiv.textContent = "Please upload a valid XLSX or CSV file.";
-          this.homepage.style.display = 'block';
-          this.outputSection.style.display = 'none';
-          return;
-        }
-
-        try {
-          this.showProgress(0);
-          const sheet = await this.readFileAsync(file);
-          this.processAndRender(sheet);
-        } catch (err) {
-          this.handleError(err);
-        }
-      }
-      
-      /**
-       * Handler for the paste event on the table body.
-       * @param {ClipboardEvent} event The paste event.
-       */
-      handlePastedData(event) {
-        event.preventDefault(); // Prevent the default paste action
-        
-        const pastedText = event.clipboardData.getData('text/plain');
-        if (!pastedText) {
-          this.handleError(new Error("Pasted data is empty or not plain text."));
-          return;
-        }
-        
-        try {
-          this.parsedData = this.parsePastedData(pastedText);
-          this.renderPastedData(this.parsedData);
-        } catch (err) {
-          this.handleError(err);
-        }
-      }
-      
-      /**
-       * Renders the parsed data directly into the visual table.
-       * @param {Array<Object>} data The parsed transaction data.
-       */
-      renderPastedData(data) {
-        this.pasteTableBody.innerHTML = '';
-        data.forEach(row => {
-          const rowDiv = document.createElement('div');
-          rowDiv.className = 'spreadsheet-row';
-          
-          Object.values(row).forEach(cellValue => {
-            const cellDiv = document.createElement('div');
-            cellDiv.className = 'spreadsheet-cell';
-            cellDiv.textContent = cellValue;
-            rowDiv.appendChild(cellDiv);
-          });
-          this.pasteTableBody.appendChild(rowDiv);
-        });
-      }
-
-      /**
-       * Parses raw pasted CSV or tab-separated data into a structured format.
-       * @param {string} rawData The raw text data from the paste event.
-       * @returns {Array<Object>} An array of structured transaction objects.
-       * @throws {Error} Throws an error if the data is invalid.
-       */
-      parsePastedData(rawData) {
-        // Detect delimiter: tab for spreadsheet paste, comma for CSV
-        const delimiter = rawData.includes('\t') ? '\t' : ',';
-        const lines = rawData.trim().split('\n');
-        
-        // Check for headers (common names like Date, Timestamp)
-        const potentialHeaderLine = lines[0].split(delimiter).map(h => h.trim().toLowerCase());
-        const hasHeader = potentialHeaderLine.includes('date(utc)') || potentialHeaderLine.includes('timestamp(utc)');
-
-        // Map column names to a standard format
-        const columnMap = {
-          date: ['date(utc)', 'timestamp(utc)'],
-          type: ['type'],
-          amount: ['amount', 'delta'],
-          asset: ['asset'],
-          symbol: ['symbol']
-        };
-        
-        // Find the index of each required column
-        const getColumnIndex = (headerArray, potentialNames) => {
-          for (const name of potentialNames) {
-            const index = headerArray.findIndex(h => h.includes(name));
-            if (index > -1) return index;
-          }
-          return -1;
+        const state = {
+            gridData: Array.from({ length: 20 }, () => Array(7).fill('')),
+            summary: null,
+            errorMessage: '',
+            isProcessing: false,
+            isGridVisible: true,
+            isDownloading: false
         };
 
-        let headers = {};
-        let dataLines = lines;
-        
-        if (hasHeader) {
-          headers.date = getColumnIndex(potentialHeaderLine, columnMap.date);
-          headers.type = getColumnIndex(potentialHeaderLine, columnMap.type);
-          headers.amount = getColumnIndex(potentialHeaderLine, columnMap.amount);
-          headers.asset = getColumnIndex(potentialHeaderLine, columnMap.asset);
-          headers.symbol = getColumnIndex(potentialHeaderLine, columnMap.symbol);
-          dataLines = lines.slice(1);
-        } else {
-          // If no header, assume a standard order for simplicity
-          headers = {
-            date: 0,
-            type: 1,
-            amount: 2,
-            asset: 3,
-            symbol: 4
-          };
+        const fixedColumnNames = [
+            'Transaction ID',
+            'FUID',
+            'asset type',
+            'value type',
+            'amount',
+            'date',
+            'symbol'
+        ];
+
+        const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658'];
+        const NON_SYMBOL_TYPES = ['TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD', 'COIN_SWAP_DEPOSIT', 'COIN_SWAP_WITHDRAW'];
+
+        // Store Chart.js instances to destroy and re-create on re-render
+        let charts = {};
+
+        function render() {
+            // Main App Structure
+            root.innerHTML = `
+                <!-- Input section -->
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+                    <div class="p-0">
+                        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                            <button id="analyze-btn" class="w-full sm:w-auto px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${state.isProcessing ? 'opacity-50 cursor-not-allowed' : ''}">
+                                ${state.isProcessing ? 'Analyzing...' : 'Analyze Data'}
+                            </button>
+                            <button id="clear-btn" class="w-full sm:w-auto px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">
+                                Clear Values
+                            </button>
+                            <button id="toggle-grid-btn" class="w-full sm:w-auto px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">
+                                ${state.isGridVisible ? 'Hide Table' : 'Show Table'}
+                            </button>
+                            <span class="text-gray-500 dark:text-gray-400">or</span>
+                            <input type="file" id="file-input" class="hidden" accept=".csv, .xlsx" />
+                            <button id="upload-btn" class="w-full sm:w-auto px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">
+                                Upload File
+                            </button>
+                            ${state.summary ? `
+                            <button id="download-pdf-btn" class="w-full sm:w-auto px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${state.isDownloading ? 'opacity-50 cursor-not-allowed' : ''}">
+                                ${state.isDownloading ? 'Downloading...' : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 12v6"/><path d="M9 15h6"/></svg> Download PDF'}
+                            </button>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Spreadsheet Grid -->
+                        <div id="grid-container" class="overflow-x-auto border border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-500 ease-in-out ${state.isGridVisible ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-25 overflow-hidden'}">
+                            <table class="w-full table-fixed border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th class="sticky top-0 left-0 bg-gray-200 dark:bg-gray-700 w-12 text-center text-sm font-semibold p-2 border border-gray-300 dark:border-gray-600"></th>
+                                        ${fixedColumnNames.map(name => `<th class="sticky top-0 bg-gray-200 dark:bg-gray-700 text-center text-sm font-semibold p-2 border border-gray-300 dark:border-gray-600 w-32">${name}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${state.gridData.map((row, rowIndex) => `
+                                        <tr>
+                                            <td class="sticky left-0 bg-gray-200 dark:bg-gray-700 w-12 text-center text-sm font-semibold p-2 border border-gray-300 dark:border-gray-600">${rowIndex + 1}</td>
+                                            ${row.map((cell, colIndex) => `
+                                                <td class="p-0 border border-gray-300 dark:border-gray-600">
+                                                    <input type="text" value="${cell}" data-row="${rowIndex}" data-col="${colIndex}" class="w-full h-8 px-2 text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-500 grid-cell-input" />
+                                                </td>
+                                            `).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error message display -->
+                ${state.errorMessage ? `
+                <div class="bg-red-500 text-white p-4 rounded-lg shadow-md mb-8">
+                    <div class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        <p class="font-medium">${state.errorMessage}</p>
+                    </div>
+                </div>
+                ` : ''}
+
+                <!-- Results section -->
+                ${state.summary ? `
+                <div id="summary-container" class="space-y-8">
+                    <div class="flex flex-col items-center p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-500"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-1.78.22c-2.82 2.22-3.8 4.91-3.18 7.37A4.7 4.7 0 0 1 3 12z"/><path d="M12 3a9 9 0 0 1 7.6 4.6l.7.8-1.5 1.5A10.6 10.6 0 0 0 12 3z"/><path d="M12 12h.01"/></svg>
+                        <div class="text-xl font-bold mt-2">${state.summary.totalTransactions}</div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400">Total Transactions Analyzed</div>
+                    </div>
+                    
+                    <!-- Individual Symbol Tables and Charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                    ${Object.entries(state.summary.symbolSummary).filter(([symbol,]) => symbol !== 'Non-Symbol Transactions').sort(([symA,], [symB,]) => symA.localeCompare(symB)).map(([symbol, data]) => `
+                        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+                            <div class="p-6">
+                                <h3 class="text-lg font-semibold">${symbol} Detailed Breakdown</h3>
+                            </div>
+                            <div class="p-6 pt-0">
+                                <!-- Symbol-specific table -->
+                                <div class="border border-gray-300 dark:border-gray-600 rounded-lg w-full overflow-hidden mb-4">
+                                    <table class="w-full table-auto text-sm">
+                                        <thead>
+                                            <tr class="bg-gray-100 dark:bg-gray-700">
+                                                <th class="p-2 text-left font-medium">Value Type</th>
+                                                <th class="p-2 text-right font-medium">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${Object.entries(data.breakdown).map(([type, amount]) => `
+                                                <tr class="border-b border-gray-200 dark:border-gray-600 last:border-b-0">
+                                                    <td class="p-2">${type}</td>
+                                                    <td class="p-2 text-right ${amount >= 0 ? 'text-green-500' : 'text-red-500'}">${amount.toFixed(8)}</td>
+                                                </tr>
+                                            `).join('')}
+                                            <tr class="bg-gray-100 dark:bg-gray-700 font-bold">
+                                                <td class="p-2">Total</td>
+                                                <td class="p-2 text-right ${data.total >= 0 ? 'text-green-500' : 'text-red-500'}">
+                                                    ${data.total.toFixed(8)}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Trading Volume -->
+                                <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md w-full mb-4">
+                                    <div class="text-sm text-gray-500 dark:text-gray-400">Approximate trading volume</div>
+                                    <div class="text-xl font-bold mt-1 text-gray-900 dark:text-gray-100">
+                                        ${data.tradingVolume !== null ? `$${data.tradingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
+                                    </div>
+                                </div>
+                                <!-- Percentage Breakdown -->
+                                <div class="mt-4">
+                                    <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300">Breakdown by Percentage</h4>
+                                    <ul class="space-y-1 mt-2">
+                                        ${data.chartData.map((item, index) => `
+                                            <li class="flex items-center justify-between text-sm p-2 rounded-md bg-gray-100 dark:bg-gray-700">
+                                                <div class="flex items-center space-x-2">
+                                                    <div class="w-3 h-3 rounded-full" style="background-color: ${COLORS[index % COLORS.length]};"></div>
+                                                    <span>${item.name}</span>
+                                                </div>
+                                                <span class="font-medium text-blue-500">${(item.percentage).toFixed(2)}%</span>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                                <!-- Pie Chart -->
+                                <div class="w-full mt-4">
+                                    <canvas id="chart-canvas-${symbol}"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                    </div>
+
+                    <!-- Non-Symbol Transactions Table -->
+                    ${state.summary.symbolSummary['Non-Symbol Transactions'] ? `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+                        <div class="p-6">
+                            <h3 class="text-lg font-semibold">Non-Symbol Transactions</h3>
+                        </div>
+                        <div class="p-6 pt-0">
+                            <div class="border border-gray-300 dark:border-gray-600 rounded-lg w-full overflow-hidden">
+                                <table class="w-full table-auto text-sm">
+                                    <thead>
+                                        <tr class="bg-gray-100 dark:bg-gray-700">
+                                            <th class="p-2 text-left font-medium">Value Type</th>
+                                            <th class="p-2 text-right font-medium">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${Object.entries(state.summary.symbolSummary['Non-Symbol Transactions'].breakdown).map(([type, amount]) => `
+                                            <tr class="border-b border-gray-200 dark:border-gray-600 last:border-b-0">
+                                                <td class="p-2">${type}</td>
+                                                <td class="p-2 text-right ${amount >= 0 ? 'text-green-500' : 'text-red-500'}">${amount.toFixed(8)}</td>
+                                            </tr>
+                                        `).join('')}
+                                        <tr class="bg-gray-100 dark:bg-gray-700 font-bold">
+                                            <td class="p-2">Total</td>
+                                            <td class="p-2 text-right ${state.summary.symbolSummary['Non-Symbol Transactions'].total >= 0 ? 'text-green-500' : 'text-red-500'}">
+                                                ${state.summary.symbolSummary['Non-Symbol Transactions'].total.toFixed(8)}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+                ` : ''}
+            `;
+
+            attachEvents();
+            if (state.summary) {
+                renderCharts();
+            }
         }
-        
-        // Check for missing required columns after mapping
-        const missing = Object.entries(headers)
-            .filter(([key, value]) => value === -1)
-            .map(([key]) => key);
 
-        if (missing.length > 0) {
-            throw new Error(`Missing one or more required columns: ${missing.map(c => `'${c}'`).join(', ')}. Please ensure the data format is correct.`);
-        }
-        
-        const transactions = [];
-        const typesToCheck = ['COMMISSION', 'REALIZED_PNL', 'FUNDING_FEE', 'LIQUIDATION_FEE'];
+        function attachEvents() {
+            document.getElementById('analyze-btn').onclick = handleAnalyzeGrid;
+            document.getElementById('clear-btn').onclick = handleClearGrid;
+            document.getElementById('toggle-grid-btn').onclick = handleToggleGrid;
+            document.getElementById('upload-btn').onclick = () => document.getElementById('file-input').click();
+            document.getElementById('file-input').onchange = handleFileChange;
+            
+            if (state.summary) {
+                document.getElementById('download-pdf-btn').onclick = handleDownloadPdf;
+            }
 
-        dataLines.forEach((line) => {
-          const values = line.split(delimiter).map(v => v.trim());
-          if (values.length < Object.keys(headers).length) return; // Skip incomplete lines
-          
-          const tx = {
-            'Timestamp(UTC)': values[headers.date] || '',
-            'Type': values[headers.type] ? values[headers.type].toUpperCase().replace(/\s/g, '_') : 'UNKNOWN',
-            'Delta': parseFloat(values[headers.amount]) || 0,
-            'Asset': values[headers.asset] || 'USDT',
-            'Symbol': values[headers.symbol] || '--',
-          };
-          
-          if (typesToCheck.includes(tx['Type']) && isNaN(tx['Delta'])) {
-              throw new Error(`Invalid or missing 'Delta' value for transaction type: ${tx['Type']} on date: ${tx['Timestamp(UTC)']}`);
-          }
-          
-          transactions.push(tx);
-        });
-
-        if (transactions.length === 0) {
-            throw new Error("Pasted data could not be parsed. Please check the format.");
-        }
-
-        return transactions;
-      }
-
-
-      /**
-       * Processes the sheet data to generate a summary.
-       * @param {Array<Object>} sheet The array of transaction objects.
-       * @param {number} initialBalance The user's initial wallet balance.
-       * @returns {Object} A structured summary of the data.
-       */
-      processAndRender(sheet) {
-        if (!sheet) {
-          sheet = this.extractDataFromTable();
-          if (!sheet || sheet.length === 0) {
-            this.handleError(new Error("No data to analyze. Please upload a file or paste data."));
-            return;
-          }
-        }
-        
-        this.errorDiv.textContent = "";
-        this.outputDiv.innerHTML = "";
-        
-        const initialBalance = parseFloat(this.initialBalanceInput.value);
-        if (isNaN(initialBalance)) {
-          this.handleError(new Error("Please enter a valid initial balance."));
-          return;
-        }
-
-        this.homepage.style.display = 'none';
-        this.outputSection.style.display = 'block';
-        
-        if (sheet.length === 0) {
-            this.handleError(new Error("No data found in sheet."));
-            return;
-        }
-        
-        this.showProgress(75);
-        const tradingSummary = this.processData(sheet, initialBalance);
-        this.renderOutput(tradingSummary);
-        
-        this.showProgress(100);
-        setTimeout(() => this.progressContainer.style.display = "none", 500);
-      }
-      
-      /**
-       * Extracts data from the HTML table cells.
-       * @returns {Array<Object>} An array of structured transaction objects.
-       */
-      extractDataFromTable() {
-        const rows = Array.from(this.pasteTableBody.querySelectorAll('.spreadsheet-row'));
-        if (rows.length === 0) return null;
-
-        const data = [];
-        rows.forEach(row => {
-          const cells = Array.from(row.querySelectorAll('.spreadsheet-cell'));
-          if (cells.some(cell => cell.textContent.trim() !== '')) {
-            data.push({
-              'Timestamp(UTC)': cells[0].textContent.trim(),
-              'Type': cells[1].textContent.trim(),
-              'Delta': parseFloat(cells[2].textContent.trim()),
-              'Asset': cells[3].textContent.trim(),
-              'Symbol': cells[4].textContent.trim(),
+            document.querySelectorAll('.grid-cell-input').forEach(input => {
+                input.oninput = (e) => {
+                    const row = parseInt(e.target.dataset.row);
+                    const col = parseInt(e.target.dataset.col);
+                    state.gridData[row][col] = e.target.value;
+                };
+                input.onpaste = handlePaste;
             });
-          }
-        });
-        return data;
-      }
+        }
 
-      /**
-       * Handles and displays errors.
-       * @param {Error} err The error object.
-       */
-      handleError(err) {
-        console.error(err);
-        this.errorDiv.textContent = `Error: ${err.message}. Please ensure the data format is correct.`;
-        this.progressContainer.style.display = "none";
-        this.homepage.style.display = 'block';
-        this.outputSection.style.display = 'none';
-      }
+        function parseData(rawData) {
+            const lines = rawData.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length === 0) return [];
+            const isTabSeparated = lines[0].includes('\t');
+            const delimiter = isTabSeparated ? '\t' : ',';
+            
+            return lines.map(line => {
+                const cells = [];
+                let inQuote = false;
+                let cell = '';
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    if (char === '"') {
+                        inQuote = !inQuote;
+                    } else if (char === delimiter && !inQuote) {
+                        cells.push(cell.trim());
+                        cell = '';
+                    } else {
+                        cell += char;
+                    }
+                }
+                cells.push(cell.trim());
+                return cells;
+            });
+        }
 
-      /**
-       * Reads the file asynchronously using a Promise.
-       * @param {File} file The file object to read.
-       * @returns {Promise<Array<Object>>} A promise that resolves with the parsed sheet data.
-       */
-      readFileAsync(file) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
+        function processData(rawData) {
+            state.isProcessing = true;
+            state.errorMessage = '';
+            state.summary = null;
+            render();
 
-          reader.onload = (e) => {
             try {
-              this.showProgress(50);
-              const data = new Uint8Array(e.target.result);
-              const workbook = XLSX.read(data, { type: "array" });
-              const sheetName = workbook.SheetNames[0];
-              const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: 0 });
-              resolve(sheet);
-            } catch (err) {
-              reject(err);
-            }
-          };
-
-          reader.onerror = (err) => reject(err);
-          reader.readAsArrayBuffer(file);
-        });
-      }
-
-      /**
-       * Updates the progress bar visually.
-       * @param {number} percent The percentage to set the progress bar to.
-       */
-      showProgress(percent) {
-        this.progressContainer.style.display = "block";
-        this.progressBar.style.width = percent + "%";
-        this.progressBar.textContent = `${Math.round(percent)}%`;
-      }
-
-      /**
-       * Processes the raw sheet data to generate a summary.
-       * @param {Array<Object>} sheet The array of transaction objects.
-       * @param {number} initialBalance The user's initial wallet balance.
-       * @returns {Object} A structured summary of the data.
-       */
-      processData(sheet, initialBalance) {
-        const summary = {
-          perSymbol: {},
-          transfers: { transferIn: 0, transferOut: 0 },
-          timeseries: []
-        };
-        const typeMap = {
-          'COMMISSION': 'tradingFees', 'REALIZED_PNL': 'profitAndLoss',
-          'FUNDING_FEE': 'fundingFees', 'LIQUIDATION_FEE': 'liquidation',
-          'TRANSFER': 'transfer', 'STRATEGY_UMFUTURES_TRANSFER': 'transfer',
-          'BFUSD_REWARD': 'tradingFees'
-        };
-        
-        const columnMap = {
-          'Date(UTC)': ['Date(UTC)', 'Timestamp(UTC)'],
-          'Amount': ['Amount', 'Delta'],
-          'Type': ['Type'],
-          'Symbol': ['symbol', 'Symbol']
-        };
-        
-        const findColumn = (row, potentialNames) => {
-            const keys = Object.keys(row);
-            for (const name of potentialNames) {
-                for (const key of keys) {
-                    if (key.toLowerCase().includes(name.toLowerCase())) {
-                        return key;
-                    }
+                const parsedRows = parseData(rawData);
+                if (parsedRows.length < 2) {
+                    state.errorMessage = 'File must contain a header and at least one row of data.';
+                    state.isProcessing = false;
+                    render();
+                    return;
                 }
+                
+                const headerRow = parsedRows[0];
+                const dataRows = parsedRows.slice(1);
+
+                // Find the indices of the required columns dynamically
+                const typeIndex = headerRow.findIndex(h => h.trim().toLowerCase() === 'type');
+                const amountIndex = headerRow.findIndex(h => h.trim().toLowerCase() === 'amount');
+                const symbolIndex = headerRow.findIndex(h => h.trim().toLowerCase() === 'symbol');
+                
+                if (typeIndex === -1 || amountIndex === -1 || symbolIndex === -1) {
+                    state.errorMessage = `Could not find all required columns (Type, Amount, Symbol). Please check your file's headers.`;
+                    state.isProcessing = false;
+                    render();
+                    return;
+                }
+
+                // Value type mapping based on user request
+                const valueTypeMapping = {
+                    'COMMISSION': 'Trading fees',
+                    'FUNDING_FEE': 'Funding fees',
+                    'REALIZED_PNL': 'Profit and losses',
+                };
+
+                const symbolSummary = {};
+                let totalTransactions = 0;
+
+                dataRows.forEach(row => {
+                    // Check if the row has enough columns to avoid errors
+                    if (row.length > Math.max(typeIndex, amountIndex, symbolIndex)) {
+                        const originalValueType = row[typeIndex]?.toUpperCase();
+                        const amount = parseFloat(row[amountIndex]);
+                        let symbol = row[symbolIndex];
+
+                        if (NON_SYMBOL_TYPES.includes(originalValueType)) {
+                            symbol = 'Non-Symbol Transactions';
+                        }
+                        
+                        // Apply the mapping, or use the original type if no mapping exists
+                        const mappedValueType = valueTypeMapping[originalValueType] || originalValueType;
+
+                        // Only process valid transactions
+                        if (mappedValueType && !isNaN(amount) && symbol && symbol.trim() !== '') {
+                            totalTransactions++;
+                            if (!symbolSummary[symbol]) {
+                                symbolSummary[symbol] = { total: 0, breakdown: {}, chartData: [], tradingVolume: null };
+                            }
+                            if (!symbolSummary[symbol].breakdown[mappedValueType]) {
+                                symbolSummary[symbol].breakdown[mappedValueType] = 0;
+                            }
+                            symbolSummary[symbol].breakdown[mappedValueType] += amount;
+                            symbolSummary[symbol].total += amount;
+                        }
+                    }
+                });
+                
+                if (totalTransactions === 0) {
+                    state.errorMessage = 'No valid transactions with a symbol, value type, and amount could be found in the data.';
+                    state.isProcessing = false;
+                    render();
+                    return;
+                }
+
+                Object.keys(symbolSummary).forEach(symbol => {
+                    const breakdownData = symbolSummary[symbol].breakdown;
+                    
+                    const totalAbsoluteValue = Object.values(breakdownData).reduce((sum, value) => sum + Math.abs(value), 0);
+
+                    // Add percentage to the chartData for rendering the list
+                    symbolSummary[symbol].chartData = Object.entries(breakdownData).map(([name, value]) => ({
+                        name,
+                        value: Math.abs(value),
+                        percentage: totalAbsoluteValue > 0 ? (Math.abs(value) / totalAbsoluteValue) * 100 : 0
+                    }));
+
+                    // Calculate trading volume only for actual trading symbols
+                    if (symbol !== 'Non-Symbol Transactions') {
+                        const tradingFees = breakdownData['Trading fees'];
+                        if (tradingFees !== undefined && tradingFees !== 0) {
+                            symbolSummary[symbol].tradingVolume = Math.abs(tradingFees) / 0.0005; 
+                        }
+                    }
+                });
+
+                state.summary = { symbolSummary, totalTransactions };
+                state.isProcessing = false;
+                state.isGridVisible = false;
+                render();
+            } catch (error) {
+                console.error('Data processing error:', error);
+                state.errorMessage = `An error occurred while processing the data: ${error.message}`;
+                state.isProcessing = false;
+                render();
             }
-            return null;
-        };
+        }
 
-        const sortedSheet = sheet.sort((a, b) => {
-            const dateA = new Date(a[findColumn(a, columnMap['Date(UTC)'])]);
-            const dateB = new Date(b[findColumn(b, columnMap['Date(UTC)'])]);
-            return dateA - dateB;
-        });
+        function handlePaste(e) {
+            e.preventDefault();
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const parsedData = parseData(pastedText);
 
-        let cumulativePnL = 0;
-        let cumulativeFees = 0;
-        let cumulativeWalletBalance = initialBalance;
+            let rowStart = 0;
+            let colStart = 0;
+            if (document.activeElement && document.activeElement.classList.contains('grid-cell-input')) {
+                rowStart = parseInt(document.activeElement.dataset.row, 10);
+                colStart = parseInt(document.activeElement.dataset.col, 10);
+            }
+            
+            const newGridData = state.gridData.map(row => [...row]);
+            
+            parsedData.forEach((pastedRow, rIdx) => {
+                pastedRow.forEach((pastedCell, cIdx) => {
+                    const gridRowIndex = rowStart + rIdx;
+                    const gridColIndex = colStart + cIdx;
+                    if (gridRowIndex < newGridData.length && gridColIndex < newGridData[gridRowIndex].length) {
+                        newGridData[gridRowIndex][gridColIndex] = pastedCell;
+                    }
+                });
+            });
 
-        sortedSheet.forEach((row) => {
-          const type = row[findColumn(row, columnMap.Type)] ? row[findColumn(row, columnMap.Type)].toUpperCase().replace(/\s/g, '_') : 'UNKNOWN';
-          const amount = Number(row[findColumn(row, columnMap.Amount)] || 0);
-          const symbol = row[findColumn(row, columnMap.Symbol)] || "--";
+            state.gridData = newGridData;
+            render();
+        }
+        
+        function handleFileChange(e) {
+            const file = e.target.files[0];
+            if (!file) {
+                return;
+            }
 
-          if (!summary.perSymbol[symbol]) {
-            summary.perSymbol[symbol] = { tradingFees: 0, profitAndLoss: 0, fundingFees: 0, liquidation: 0 };
-          }
-          const category = typeMap[type] || 'unknown';
+            state.isProcessing = true;
+            state.errorMessage = '';
+            state.summary = null;
+            render();
+            
+            const fileExtension = file.name.split('.').pop().toLowerCase();
 
-          if (category === 'transfer') {
-            if (amount > 0) {
-              summary.transfers.transferIn += amount;
+            const reader = new FileReader();
+
+            reader.onload = (event) => {
+                let fileData = event.target.result;
+                let dataString = '';
+
+                if (fileExtension === 'csv') {
+                    // For CSV files, read as text and process directly
+                    dataString = fileData;
+                    processData(dataString);
+                } else if (fileExtension === 'xlsx') {
+                    // For XLSX files, process with the XLSX library
+                    try {
+                        const workbook = XLSX.read(fileData, { type: 'binary' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        dataString = XLSX.utils.sheet_to_csv(worksheet);
+                        processData(dataString);
+                    } catch (error) {
+                        console.error('Excel processing error:', error);
+                        state.errorMessage = `Failed to process Excel file: ${error.message}. Please ensure it is a valid .xlsx file.`;
+                        state.isProcessing = false;
+                        render();
+                    }
+                } else {
+                    state.errorMessage = 'Unsupported file type. Please upload a .csv or .xlsx file.';
+                    state.isProcessing = false;
+                    render();
+                }
+            };
+
+            reader.onerror = () => {
+                state.errorMessage = 'Error reading file. Please try again.';
+                state.isProcessing = false;
+                render();
+            };
+
+            if (fileExtension === 'csv') {
+                reader.readAsText(file);
+            } else if (fileExtension === 'xlsx') {
+                reader.readAsBinaryString(file);
+            }
+        }
+
+        function getGridDataAsString() {
+            const dataRows = state.gridData
+                .filter(row => row.some(cell => cell.trim() !== ''))
+                .map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','));
+            return dataRows.join('\n');
+        }
+
+        function handleAnalyzeGrid() {
+            const dataString = getGridDataAsString();
+            if (dataString.trim() !== '') {
+                processData(dataString);
             } else {
-              summary.transfers.transferOut += amount;
+                state.errorMessage = 'Please enter or paste data into the grid before analyzing.';
+                render();
             }
-            cumulativeWalletBalance += amount;
-          } else {
-            if (summary.perSymbol[symbol][category] !== undefined) {
-              summary.perSymbol[symbol][category] += amount;
-            }
-          }
-
-          const fees = Math.abs(type === 'COMMISSION' ? amount : 0) +
-                       Math.abs(type === 'FUNDING_FEE' ? amount : 0) +
-                       Math.abs(type === 'LIQUIDATION_FEE' ? amount : 0);
-          const pnl = type === 'REALIZED_PNL' ? amount : 0;
-          cumulativePnL += pnl;
-          cumulativeFees += fees;
-          
-          cumulativeWalletBalance += amount;
-          
-          summary.timeseries.push({
-            date: new Date(row[findColumn(row, columnMap['Date(UTC)'])].toString()),
-            pnl: cumulativePnL,
-            fees: cumulativeFees,
-            walletBalance: cumulativeWalletBalance
-          });
-        });
-        return summary;
-      }
-
-      /**
-       * Renders all the HTML output and charts based on the processed summary.
-       * @param {Object} summary The data summary object.
-       */
-      renderOutput(summary) {
-        let grandTotals = { tradingFees: 0, profitAndLoss: 0, fundingFees: 0, liquidation: 0 };
-        for (const symbol in summary.perSymbol) {
-          for (const key in summary.perSymbol[symbol]) {
-            grandTotals[key] += summary.perSymbol[symbol][key];
-          }
         }
-
-        const totalFees = Math.abs(grandTotals.tradingFees) + Math.abs(grandTotals.fundingFees) + Math.abs(grandTotals.liquidation);
-        const totalPnL = grandTotals.profitAndLoss;
-
-        let htmlOutput = `
-          <h2>Total Fees vs. Profit & Loss</h2>
-          <div class="chart-container"><canvas id="barChart"></canvas></div>
-          <h2>PnL Growth & Fees Analysis</h2>
-          <div class="chart-container"><canvas id="lineChart"></canvas></div>
-          <h2>Wallet Balance Growth</h2>
-          <div class="chart-container"><canvas id="walletChart"></canvas></div>
-          <h2>Summary per Symbol</h2>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th title="The trading pair or contract symbol (e.g., BTCUSDT).">Symbol</th>
-                  <th title="Trading fees are based on trade size. They are a cost (negative value) for market takers (0.05%) and can be a rebate (positive value) for market makers (0.02%).">Trading Fees</th>
-                  <th title="Realized Profit and Loss (PnL) from closed positions.">Profit & Loss</th>
-                  <th title="Funding fees are periodic payments exchanged between long and short traders to keep the contract price in line with the underlying asset price. They can be positive or negative.">Funding Fees</th>
-                  <th title="Fees incurred from the liquidation of a position.">Liquidation</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${Object.entries(summary.perSymbol).map(([symbol, values]) => `
-                  <tr id="symbol-row-${symbol}">
-                    <td>${symbol}</td>
-                    <td>${values.tradingFees.toFixed(2)}</td>
-                    <td>${values.profitAndLoss.toFixed(2)}</td>
-                    <td>${values.fundingFees.toFixed(2)}</td>
-                    <td>${values.liquidation.toFixed(2)}</td>
-                  </tr>
-                `).join('')}
-                <tr style="font-weight:bold;background:#e9ecef;">
-                  <td>Grand Total</td>
-                  <td>${grandTotals.tradingFees.toFixed(2)}</td>
-                  <td>${grandTotals.profitAndLoss.toFixed(2)}</td>
-                  <td>${grandTotals.fundingFees.toFixed(2)}</td>
-                  <td>${grandTotals.liquidation.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <h2>Detailed Breakdown by Symbol</h2>
-          <div class="pie-chart-container" id="symbol-pie-charts"></div>
-          <h2>Transfer Summary</h2>
-          <div class="table-container">
-            <table>
-              <thead>
-                <tr>
-                  <th title="Total amount of assets transferred into your account.">Transfer In (Positive)</th>
-                  <th title="Total amount of assets transferred out of your account.">Transfer Out (Negative)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>${summary.transfers.transferIn.toFixed(2)}</td>
-                  <td>${summary.transfers.transferOut.toFixed(2)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        `;
-        this.outputDiv.innerHTML = htmlOutput;
-
-        this.renderBarChart(totalFees, totalPnL);
-        this.renderLineChart(summary.timeseries);
-        this.renderWalletChart(summary.timeseries);
-        this.renderSymbolPieCharts(summary.perSymbol);
-      }
-
-      /**
-       * Renders the bar chart for total fees vs. PnL.
-       * @param {number} totalFees Total fees for the period.
-       * @param {number} totalPnL Total PnL for the period.
-       */
-      renderBarChart(totalFees, totalPnL) {
-        const ctxBar = document.getElementById('barChart').getContext('2d');
-        new Chart(ctxBar, {
-          type: 'bar',
-          data: {
-            labels: ['Total Fees', 'Total P&L'],
-            datasets: [{
-              label: 'Amount (USDT)',
-              data: [totalFees, totalPnL],
-              backgroundColor: [
-                '#5bc0de', // Fees color
-                '#5cb85c'  // PnL color
-              ],
-              borderColor: [
-                '#46a6c7',
-                '#46a646'
-              ],
-              borderWidth: 1,
-              borderRadius: 5,
-            }]
-          },
-          options: {
-            responsive: true,
-            scales: {
-              y: { 
-                beginAtZero: true, 
-                grid: { color: 'rgba(0,0,0,0.05)' }, 
-                ticks: { color: 'var(--secondary-color)' } 
-              },
-              x: { 
-                grid: { display: false }, 
-                ticks: { color: 'var(--secondary-color)' } 
-              }
-            },
-            plugins: {
-              legend: { display: false },
-              title: { display: true, text: 'Total Fees vs. Total Profit and Loss', color: 'var(--text-color)' },
-              tooltip: { 
-                callbacks: { 
-                  label: (c) => `${c.dataset.label}: ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(c.parsed.y)}` 
-                }
-              }
-            },
-            animation: {
-              duration: 1500,
-              easing: 'easeInOutQuart'
-            }
-          }
-        });
-      }
-
-      /**
-       * Renders the line chart for cumulative PnL and fees.
-       * @param {Array<Object>} timeseries The time series data.
-       */
-      renderLineChart(timeseries) {
-        const ctxLine = document.getElementById('lineChart').getContext('2d');
-        const dates = timeseries.map(item => item.date.toLocaleDateString());
-        const pnlData = timeseries.map(item => item.pnl);
-        const feesData = timeseries.map(item => item.fees);
-
-        // Create gradients for a more polished look
-        const pnlGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
-        pnlGradient.addColorStop(0, 'rgba(40, 167, 69, 0.4)');
-        pnlGradient.addColorStop(1, 'rgba(40, 167, 69, 0)');
-        const feesGradient = ctxLine.createLinearGradient(0, 0, 0, 400);
-        feesGradient.addColorStop(0, 'rgba(0, 123, 255, 0.4)');
-        feesGradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
-
-        new Chart(ctxLine, {
-          type: 'line',
-          data: {
-            labels: dates,
-            datasets: [
-              {
-                label: 'Cumulative PnL',
-                data: pnlData,
-                borderColor: 'rgba(40, 167, 69, 1)',
-                backgroundColor: pnlGradient,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 7,
-                pointBackgroundColor: 'rgba(40, 167, 69, 1)',
-              },
-              {
-                label: 'Cumulative Fees',
-                data: feesData,
-                borderColor: 'rgba(0, 123, 255, 1)',
-                backgroundColor: feesGradient,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 7,
-                pointBackgroundColor: 'rgba(0, 123, 255, 1)',
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            scales: {
-              x: { 
-                grid: { color: 'rgba(0,0,0,0.05)' }, 
-                title: { display: true, text: 'Date', color: 'var(--secondary-color)' }, 
-                ticks: { color: 'var(--secondary-color)' } 
-              },
-              y: { 
-                grid: { color: 'rgba(0,0,0,0.05)' }, 
-                title: { display: true, text: 'Amount (USDT)', color: 'var(--secondary-color)' }, 
-                ticks: { color: 'var(--secondary-color)' } 
-              }
-            },
-            plugins: { 
-              legend: { position: 'top', labels: { color: 'var(--text-color)' } }, 
-              title: { display: true, text: 'Cumulative PnL and Fees Over Time', color: 'var(--text-color)' }, 
-              tooltip: { mode: 'index', intersect: false } 
-            },
-            animation: { 
-              duration: 2000, 
-              easing: 'easeInOutQuart' 
-            }
-          }
-        });
-      }
-
-      /**
-       * Renders the line chart for cumulative wallet balance.
-       * @param {Array<Object>} timeseries The time series data.
-       */
-      renderWalletChart(timeseries) {
-        const ctxWallet = document.getElementById('walletChart').getContext('2d');
-        const walletData = timeseries.map(item => item.walletBalance);
-        const walletGradient = ctxWallet.createLinearGradient(0, 0, 0, 400);
-        walletGradient.addColorStop(0, 'rgba(255, 159, 64, 0.4)');
-        walletGradient.addColorStop(1, 'rgba(255, 159, 64, 0)');
-
-        new Chart(ctxWallet, {
-          type: 'line',
-          data: {
-            labels: timeseries.map(item => item.date.toLocaleDateString()),
-            datasets: [
-              {
-                label: 'Cumulative Wallet Balance',
-                data: walletData,
-                borderColor: 'rgba(255, 159, 64, 1)',
-                backgroundColor: walletGradient,
-                fill: true,
-                tension: 0.4,
-                pointRadius: 3,
-                pointHoverRadius: 7,
-                pointBackgroundColor: 'rgba(255, 159, 64, 1)',
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            scales: {
-              x: { 
-                grid: { color: 'rgba(0,0,0,0.05)' }, 
-                title: { display: true, text: 'Date', color: 'var(--secondary-color)' }, 
-                ticks: { color: 'var(--secondary-color)' } 
-              },
-              y: { 
-                grid: { color: 'rgba(0,0,0,0.05)' }, 
-                title: { display: true, text: 'Balance (USDT)', color: 'var(--secondary-color)' }, 
-                ticks: { color: 'var(--secondary-color)' } 
-              }
-            },
-            plugins: { 
-              legend: { display: false }, 
-              title: { display: true, text: 'Wallet Balance Growth Over Time', color: 'var(--text-color)' }, 
-              tooltip: { mode: 'index', intersect: false } 
-            },
-            animation: { 
-              duration: 2000, 
-              easing: 'easeInOutQuart' 
-            }
-          }
-        });
-      }
-
-      /**
-       * Renders a pie chart for each symbol.
-       * @param {Object} perSymbolData The object containing data for each symbol.
-       */
-      renderSymbolPieCharts(perSymbolData) {
-        const container = document.getElementById('symbol-pie-charts');
-        const colors = ['#007bff', '#28a745', '#dc3545', '#ffc107', '#6c757d', '#17a2b8', '#fd7e14'];
         
-        for (const [symbol, values] of Object.entries(perSymbolData)) {
-          // Filter out symbols with no relevant data (only transfers)
-          if (Object.values(values).every(val => val === 0)) continue;
+        function handleClearGrid() {
+            state.gridData = Array.from({ length: 20 }, () => Array(7).fill(''));
+            state.summary = null;
+            state.errorMessage = '';
+            state.isGridVisible = true;
+            render();
+        }
 
-          // Create a new div and canvas for each chart
-          const chartWrapper = document.createElement('div');
-          chartWrapper.className = 'pie-chart-item';
-          
-          const chartTitle = document.createElement('h4');
-          chartTitle.textContent = `${symbol}`;
-          
-          const canvas = document.createElement('canvas');
-          canvas.id = `pieChart-${symbol}`;
-          canvas.width = 250;
-          canvas.height = 250;
-          
-          chartWrapper.appendChild(chartTitle);
-          chartWrapper.appendChild(canvas);
-          container.appendChild(chartWrapper);
+        function handleToggleGrid() {
+            state.isGridVisible = !state.isGridVisible;
+            render();
+        }
 
-          const ctx = canvas.getContext('2d');
-          const data = [
-            values.profitAndLoss,
-            Math.abs(values.tradingFees),
-            Math.abs(values.fundingFees),
-            Math.abs(values.liquidation)
-          ];
-          
-          const labels = ['Profit & Loss', 'Trading Fees', 'Funding Fees', 'Liquidation Fees'];
-          
-          new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-              labels: labels,
-              datasets: [{
-                data: data,
-                backgroundColor: colors,
-                borderColor: 'var(--card-bg)',
-                borderWidth: 2,
-              }]
-            },
-            options: {
-              responsive: true,
-              cutout: '60%',
-              plugins: {
-                legend: {
-                  position: 'bottom',
-                  labels: {
-                    color: 'var(--text-color)',
-                    boxWidth: 15,
-                    font: { size: 12 }
-                  }
-                },
-                title: {
-                  display: false,
-                },
-                tooltip: {
-                  callbacks: {
-                    label: (context) => {
-                      const label = context.label || '';
-                      const value = context.parsed || 0;
-                      const total = context.dataset.data.reduce((acc, current) => acc + current, 0);
-                      const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
-                      return `${label}: ${value.toFixed(2)} USDT (${percentage}%)`;
-                    }
-                  }
-                }
-              }
+        async function handleDownloadPdf() {
+            state.isDownloading = true;
+            render();
+            
+            const element = document.getElementById('summary-container');
+            if (!element) {
+                state.isDownloading = false;
+                state.errorMessage = 'Could not find summary element to download.';
+                render();
+                return;
             }
-          });
+
+            try {
+                const canvas = await html2canvas(element, { scale: 2, logging: false });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 297;
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                
+                pdf.save('TransactionSummary.pdf');
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                state.errorMessage = `Failed to generate PDF: ${error.message}`;
+            } finally {
+                state.isDownloading = false;
+                render();
+            }
         }
-      }
-      
-      /**
-       * Scrolls the page to the specified symbol's table row.
-       * @param {string} symbol The trading symbol to scroll to.
-       */
-      scrollToSymbol(symbol) {
-        const element = document.getElementById(`symbol-row-${symbol}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Function to destroy old charts and render new ones using Chart.js
+        function renderCharts() {
+            if (!state.summary) return;
+
+            // Destroy any existing chart instances to prevent memory leaks
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            const { symbolSummary } = state.summary;
+            
+            Object.entries(symbolSummary).filter(([symbol,]) => symbol !== 'Non-Symbol Transactions').forEach(([symbol, data]) => {
+                const canvasElement = document.getElementById(`chart-canvas-${symbol}`);
+                if (canvasElement) {
+                    const chartData = {
+                        labels: data.chartData.map(d => d.name),
+                        datasets: [{
+                            data: data.chartData.map(d => d.value),
+                            backgroundColor: COLORS.slice(0, data.chartData.length),
+                            hoverOffset: 4
+                        }]
+                    };
+
+                    const config = {
+                        type: 'pie',
+                        data: chartData,
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: {
+                                        font: {
+                                            family: 'Inter'
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const total = context.dataset.data.reduce((sum, value) => sum + value, 0);
+                                            const value = context.parsed;
+                                            const percentage = total > 0 ? (value / total * 100).toFixed(2) : 0;
+                                            return `${context.label}: ${value.toFixed(8)} (${percentage}%)`;
+                                        },
+                                        footer: function(tooltipItems) {
+                                            let sum = 0;
+                                            tooltipItems.forEach(function(tooltipItem) {
+                                                sum += tooltipItem.parsed;
+                                            });
+                                            return `Total: ${sum.toFixed(8)}`;
+                                        }
+                                    },
+                                    bodyFont: {
+                                        family: 'Inter'
+                                    }
+                                }
+                            }
+                        }
+                    };
+
+                    // Create a new Chart.js instance and store it
+                    charts[symbol] = new Chart(canvasElement, config);
+                }
+            });
         }
-      }
-    }
-    
-    // Initialize the application once the DOM is ready.
-    document.addEventListener('DOMContentLoaded', () => {
-        new App();
-    });
-  </script>
+
+        // Initial render on page load
+        document.addEventListener('DOMContentLoaded', render);
+    </script>
 </body>
 </html>
