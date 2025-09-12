@@ -1,0 +1,741 @@
+
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+							<style>
+								body {
+									background-color: white; /* Ensure the iframe has a white background */
+								}
+
+								
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #spreadsheet-container {
+            z-index: 1;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeInUp {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+        .view-content {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .view-content.fading-out {
+            opacity: 0;
+        }
+    
+
+							</style>
+                        </head>
+                        <body>
+                            <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction History Summary</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- html2canvas and jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- XLSX for reading Excel files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Handsontable Spreadsheet Library -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/handsontable/dist/handsontable.full.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #spreadsheet-container {
+            z-index: 1;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeInUp {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+        .view-content {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .view-content.fading-out {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 sm:p-8">
+    <div id="app" class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-blue-600 dark:text-blue-400 mb-2">
+                Transaction History Summary
+            </h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300">
+                Paste or upload your transaction data to get a breakdown by symbol.
+            </p>
+        </header>
+        <div id="root"></div>
+    </div>
+    <script>
+        const { jsPDF } = window.jspdf;
+        const root = document.getElementById('root');
+        
+        const state = {
+            summary: null, errorMessage: '', isProcessing: false,
+            isGridVisible: true, isDownloading: false, analysisView: 'bySymbol',
+            startingBalance: ''
+        };
+
+        const fixedColumnNames = [
+            'Transaction ID', 'FUID', 'asset type', 'value type', 'amount', 'date', 'symbol'
+        ];
+
+        const NON_SYMBOL_TYPES = ['TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD', 'COIN_SWAP_DEPOSIT', 'COIN_SWAP_WITHDRAW'];
+        
+        let hot;
+
+        function render() {
+            root.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+                    <div>
+                        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                            <button id="analyze-btn" class="w-full sm:w-auto px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${state.isProcessing ? 'opacity-50 cursor-not-allowed' : ''}">${state.isProcessing ? 'Analyzing...' : 'Analyze Data'}</button>
+                            <button id="clear-btn" class="w-full sm:w-auto px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">Clear Values</button>
+                            <button id="toggle-grid-btn" class="w-full sm:w-auto px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">${state.isGridVisible ? 'Hide Grid' : 'Show Grid'}</button>
+                            <span class="text-gray-500 dark:text-gray-400">or</span>
+                            <input type="file" id="file-input" class="hidden" accept=".csv, .xlsx, .txt" />
+                            <button id="upload-btn" class="w-full sm:w-auto px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">Upload File</button>
+                            ${state.summary ? `<button id="download-pdf-btn" class="w-full sm:w-auto px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${state.isDownloading ? 'opacity-50 cursor-not-allowed' : ''}">${state.isDownloading ? 'Downloading...' : '<svg xmlns="http://www.w3.org/2000/svg" class="inline-block mr-2 h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd" /></svg> Download PDF'}</button>` : ''}
+                        </div>
+                        <div class="mb-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                            <label for="starting-balance-input" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Starting Wallet Balance</label>
+                            <input type="number" id="starting-balance-input" value="${state.startingBalance}" placeholder="Enter starting balance (e.g., 1000)" class="w-full px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div id="spreadsheet-container" class="${state.isGridVisible ? '' : 'hidden'}"><div id="spreadsheet"></div></div>
+                    </div>
+                </div>
+                ${state.errorMessage ? `<div class="bg-red-500 text-white p-4 rounded-lg shadow-md mb-8"><p class="font-medium">${state.errorMessage}</p></div>` : ''}
+                ${state.summary ? `<div id="summary-container" class="space-y-8 animate-fadeInUp"></div>` : ''}
+            `;
+
+            if (state.summary) {
+                const summaryContainer = document.getElementById('summary-container');
+                if (summaryContainer) {
+                    summaryContainer.innerHTML = generateSummaryHtml(state.summary);
+                }
+            }
+            
+            attachEvents();
+            
+            if (!hot) {
+                initializeSpreadsheet();
+            }
+        }
+        
+        function initializeSpreadsheet() {
+            const container = document.getElementById('spreadsheet');
+            if (!container) return;
+            hot = new Handsontable(container, {
+                data: Array.from({ length: 50 }, () => Array(7).fill('')),
+                rowHeaders: true, colHeaders: fixedColumnNames, height: 'auto', width: '100%',
+                licenseKey: 'non-commercial-and-evaluation', stretchH: 'all', contextMenu: true,
+                manualColumnResize: true, manualRowResize: true, colWidths: 100,
+                wordWrap: false, autoWrapRow: true, autoWrapCol: true,
+            });
+        }
+        
+        function attachEvents() {
+            document.getElementById('analyze-btn').onclick = handleAnalyzeGrid;
+            document.getElementById('clear-btn').onclick = handleClearGrid;
+            document.getElementById('toggle-grid-btn').onclick = handleToggleGrid;
+            document.getElementById('upload-btn').onclick = () => document.getElementById('file-input').click();
+            document.getElementById('file-input').onchange = handleFileChange;
+            document.getElementById('starting-balance-input').oninput = (e) => { state.startingBalance = e.target.value; };
+
+            if (state.summary) {
+                document.getElementById('download-pdf-btn').onclick = handleDownloadPdf;
+                document.getElementById('view-by-symbol-btn')?.addEventListener('click', () => setAnalysisView('bySymbol'));
+                document.getElementById('view-total-summary-btn')?.addEventListener('click', () => setAnalysisView('byType'));
+            }
+        }
+        
+        function setAnalysisView(view) {
+            if (state.analysisView === view) return;
+            const container = document.getElementById('view-content-container');
+            if (container) {
+                container.classList.add('fading-out');
+                setTimeout(() => {
+                    state.analysisView = view;
+                    render();
+                }, 200);
+            } else {
+                 state.analysisView = view;
+                 render();
+            }
+        }
+        
+        function handleAnalyzeGrid() {
+            if (!hot) return;
+            const gridData = hot.getData();
+            processGridData(gridData);
+        }
+
+        function processGridData(gridRows) {
+            state.isProcessing = true;
+            state.errorMessage = '';
+            state.summary = null;
+            state.analysisView = 'bySymbol';
+            render();
+
+            try {
+                const typeIndex = fixedColumnNames.indexOf('value type');
+                const amountIndex = fixedColumnNames.indexOf('amount');
+                const symbolIndex = fixedColumnNames.indexOf('symbol');
+
+                const valueTypeMapping = {
+                    'COMMISSION': 'Trading fees', 
+                    'FUNDING_FEE': 'Funding fees',
+                    'REALIZED_PNL': 'Profit and losses',
+                };
+                
+                const symbolSummary = {};
+                const typeSummary = {};
+                let totalTransactions = 0;
+
+                gridRows.forEach(row => {
+                    if (row.every(cell => cell === null || cell === '')) return;
+                    const originalValueType = row[typeIndex]?.toUpperCase();
+                    const amount = parseFloat(row[amountIndex]);
+                    let symbol = row[symbolIndex];
+                    let mappedValueType;
+                    
+                    if (originalValueType === 'INSURANCE_CLEAR') {
+                        if (!symbol || symbol.trim() === '') {
+                            mappedValueType = 'Insurance Fund adjust';
+                            symbol = 'Non-Symbol Transactions';
+                        } else {
+                            mappedValueType = 'Liquidation fees';
+                        }
+                    } else {
+                        mappedValueType = valueTypeMapping[originalValueType] || originalValueType;
+                        if (NON_SYMBOL_TYPES.includes(originalValueType)) { symbol = 'Non-Symbol Transactions'; }
+                    }
+
+                    if (mappedValueType && !isNaN(amount) && symbol && symbol.trim() !== '') {
+                        totalTransactions++;
+                        if (!symbolSummary[symbol]) { symbolSummary[symbol] = { total: 0, breakdown: {}, tradingVolume: null }; }
+                        if (!symbolSummary[symbol].breakdown[mappedValueType]) { symbolSummary[symbol].breakdown[mappedValueType] = 0; }
+                        symbolSummary[symbol].breakdown[mappedValueType] += amount;
+                        symbolSummary[symbol].total += amount;
+
+                        if (!typeSummary[mappedValueType]) { typeSummary[mappedValueType] = { total: 0, count: 0 }; }
+                        typeSummary[mappedValueType].total += amount;
+                        typeSummary[mappedValueType].count++;
+                    }
+                });
+
+                if (totalTransactions === 0) throw new Error('No valid transactions found.');
+                
+                Object.keys(symbolSummary).forEach(symbol => {
+                    const data = symbolSummary[symbol];
+                    if (symbol !== 'Non-Symbol Transactions') {
+                        const tradingFees = data.breakdown['Trading fees'];
+                        if (tradingFees !== undefined && tradingFees !== 0) { data.tradingVolume = Math.abs(tradingFees) / 0.0005; }
+                    }
+                });
+                
+                // --- CORRECTED LOGIC IS HERE ---
+                const feesAndPnlSummary = {};
+                const transferSummary = {}; // This will only hold pure transfers now
+                for (const [type, data] of Object.entries(typeSummary)) {
+                    if (type.toUpperCase() === 'TRANSFER') { 
+                        transferSummary[type] = data; 
+                    } else { 
+                        feesAndPnlSummary[type] = data; 
+                    }
+                }
+                const feesAndPnlTotal = Object.values(feesAndPnlSummary).reduce((sum, data) => sum + data.total, 0);
+                const transfersTotal = Object.values(transferSummary).reduce((sum, data) => sum + data.total, 0);
+                
+                const startBalance = parseFloat(state.startingBalance) || 0;
+                // Ending balance now includes the total of PNL, fees, AND transfers/adjustments.
+                const endingBalance = startBalance + feesAndPnlTotal + transfersTotal;
+                // --- END OF CORRECTION ---
+                
+                state.summary = { 
+                    totalTransactions, 
+                    bySymbol: symbolSummary, 
+                    byType: { feesAndPnl: feesAndPnlSummary, transfers: transferSummary, feesAndPnlTotal, transfersTotal },
+                    startBalance,
+                    endingBalance
+                };
+                state.isProcessing = false;
+                state.isGridVisible = false;
+                render();
+            } catch (error) {
+                console.error('Data processing error:', error);
+                state.errorMessage = `An error occurred: ${error.message}`;
+                state.isProcessing = false;
+                render();
+            }
+        }
+
+        function generateSummaryHtml(summary) {
+            const bySymbolActive = state.analysisView === 'bySymbol';
+            const byTypeActive = state.analysisView === 'byType';
+
+            const toggleButtons = `<div class="flex justify-center items-center space-x-2 mb-6 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg"><button id="view-by-symbol-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${bySymbolActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">By Symbol</button><button id="view-total-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${byTypeActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">Total Summary</button></div>`;
+            
+            let contentHtml = '';
+            if (bySymbolActive) {
+                contentHtml = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">${Object.entries(summary.bySymbol).filter(([symbol,]) => symbol !== 'Non-Symbol Transactions').sort(([symA,], [symB,]) => symA.localeCompare(symB)).map(([symbol, data]) => `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">${symbol} Detailed Breakdown</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full overflow-hidden mb-4"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Value Type</th><th class="p-2 text-right font-medium">Amount</th></tr></thead><tbody>${Object.entries(data.breakdown).map(([type, amount]) => `<tr class="border-b border-gray-200 dark:border-gray-600 last:border-b-0"><td class="p-2">${type}</td><td class="p-2 text-right ${amount >= 0 ? 'text-green-500' : 'text-red-500'}">${amount.toFixed(8)}</td></tr>`).join('')}<tr class="bg-gray-200 dark:bg-gray-700/50 font-bold"><td class="p-2">Total</td><td class="p-2 text-right ${data.total >= 0 ? 'text-green-500' : 'text-red-500'}">${data.total.toFixed(8)}</td></tr></tbody></table></div><div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md w-full"><div class="text-sm text-gray-500 dark:text-gray-400">Approximate trading volume</div><div class="text-xl font-bold mt-1 text-gray-900 dark:text-gray-100">${data.tradingVolume !== null ? `$${data.tradingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}</div></div></div>`).join('')}</div>`;
+            } else {
+                const { feesAndPnl, transfersTotal, feesAndPnlTotal } = summary.byType;
+                const feesAndPnlHtml = `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">Total Summary</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full overflow-hidden"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Description</th><th class="p-2 text-right font-medium">Amount</th></tr></thead><tbody>
+                    <tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Starting Wallet Balance</td><td class="p-2 text-right">${summary.startBalance.toFixed(8)}</td></tr>
+                    <tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Total Transfers & Adjustments</td><td class="p-2 text-right ${transfersTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${transfersTotal.toFixed(8)}</td></tr>
+                    ${Object.entries(feesAndPnl).sort(([typeA,],[typeB,])=>typeA.localeCompare(typeB)).map(([type, values]) => `<tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">${type}</td><td class="p-2 text-right ${values.total >= 0 ? 'text-green-500' : 'text-red-500'}">${values.total.toFixed(8)}</td></tr>`).join('')}
+                    <tr class="bg-gray-200 dark:bg-gray-700/50 font-bold"><td class="p-2">Total Fees & PNL</td><td class="p-2 text-right ${feesAndPnlTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${feesAndPnlTotal.toFixed(8)}</td></tr>
+                    <tr class="bg-blue-100 dark:bg-blue-900/50 font-bold"><td class="p-2">Ending Wallet Balance</td><td class="p-2 text-right text-blue-600 dark:text-blue-400">${summary.endingBalance.toFixed(8)}</td></tr>
+                </tbody></table></div></div>`;
+                contentHtml = `<div class="space-y-8">${feesAndPnlHtml}</div>`;
+            }
+
+            return `<div class="flex items-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-md"><svg class="h-8 w-8 text-blue-500 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg><div><div class="text-2xl font-bold text-gray-800 dark:text-white">${summary.totalTransactions}</div><div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Transactions Analyzed</div></div></div>${toggleButtons}<div id="view-content-container" class="view-content">${contentHtml}</div>`;
+        }
+        
+        function handleClearGrid() { window.location.reload(); }
+        
+        function handleToggleGrid() {
+            state.isGridVisible = !state.isGridVisible;
+            render();
+            if (state.isGridVisible && hot) { setTimeout(() => hot.render(), 0); }
+        }
+        function handleFileChange(e) {
+            const file = e.target.files[0]; if (!file) return;
+            state.isProcessing = true; render(); const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = event.target.result; let parsedRows;
+                    if (file.name.endsWith('.xlsx')) {
+                        const workbook = XLSX.read(data, { type: 'binary' });
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    } else { parsedRows = parseData(data); }
+                    const mappedData = mapSourceDataToTarget(parsedRows);
+                    if (hot) { hot.loadData(mappedData); }
+                } catch (error) { state.errorMessage = `Failed to process file: ${error.message}`; } 
+                finally { state.isProcessing = false; render(); }
+            };
+            reader.onerror = () => { state.errorMessage = 'Error reading file.'; state.isProcessing = false; render(); };
+            if (file.name.endsWith('.xlsx')) { reader.readAsBinaryString(file); } 
+            else { reader.readAsText(file); }
+        }
+        function parseData(rawData) {
+             if (!rawData || rawData.trim() === '') return [];
+            const lines = rawData.trim().split(/\r?\n/).filter(line => line.trim() !== '');
+            return lines.map(line => { let cells = line.split('\t'); if (cells.length === 1 && line.includes('  ')) { cells = line.split(/\s{2,}/).map(cell => cell.trim()); } return cells; });
+        }
+        function mapSourceDataToTarget(parsedRows) {
+            const targetData = []; if (!parsedRows || parsedRows.length === 0) return targetData;
+            let sourceIndexMap = {}; let sourceDataRows; const firstRow = parsedRows[0];
+            const hasHeaders = firstRow.length > 4 && isNaN(parseFloat(firstRow[4]));
+            if (hasHeaders) {
+                const sourceHeader = firstRow.map(h => h.trim().toLowerCase()); sourceDataRows = parsedRows.slice(1);
+                const aliasMap = { 'Transaction ID': ['transaction id'], 'FUID': ['future uid', 'fuid'], 'asset type': ['asset'], 'value type': ['type'], 'amount': ['delta', 'amount'], 'date': ['timestamp(utc)', 'update time(utc)', 'date'], 'symbol': ['symbol'] };
+                fixedColumnNames.forEach((targetColName, index) => {
+                    const aliases = aliasMap[targetColName.toLowerCase()];
+                    if (aliases) { for (const alias of aliases) { const foundIndex = sourceHeader.indexOf(alias); if (foundIndex !== -1) { sourceIndexMap[index] = foundIndex; break; } } }
+                });
+            } else { sourceDataRows = parsedRows; fixedColumnNames.forEach((name, index) => { sourceIndexMap[index] = index; }); }
+            sourceDataRows.forEach(sourceRow => {
+                const newRow = Array(fixedColumnNames.length).fill('');
+                fixedColumnNames.forEach((colName, targetIndex) => {
+                    const sourceIndex = sourceIndexMap[targetIndex]; if (sourceIndex !== undefined && sourceRow[sourceIndex] !== undefined) { newRow[targetIndex] = sourceRow[sourceIndex]; }
+                });
+                targetData.push(newRow);
+            });
+            return targetData;
+        }
+        async function handleDownloadPdf() {
+             state.isDownloading = true;
+            render();
+            const element = document.getElementById('summary-container');
+            if (!element) {
+                state.isDownloading = false;
+                state.errorMessage = 'Could not find summary element to download.';
+                render();
+                return;
+            }
+            try {
+                const canvas = await html2canvas(element, { scale: 2, logging: false });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 297;
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                pdf.save('TransactionSummary.pdf');
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                state.errorMessage = `Failed to generate PDF: ${error.message}`;
+            } finally {
+                state.isDownloading = false;
+                render();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', render);
+    </script>
+</body>
+</html>
+
+
+
+							<script>
+                            	
+        const { jsPDF } = window.jspdf;
+        const root = document.getElementById('root');
+        
+        const state = {
+            summary: null, errorMessage: '', isProcessing: false,
+            isGridVisible: true, isDownloading: false, analysisView: 'bySymbol',
+            startingBalance: ''
+        };
+
+        const fixedColumnNames = [
+            'Transaction ID', 'FUID', 'asset type', 'value type', 'amount', 'date', 'symbol'
+        ];
+
+        const NON_SYMBOL_TYPES = ['TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD', 'COIN_SWAP_DEPOSIT', 'COIN_SWAP_WITHDRAW'];
+        
+        let hot;
+
+        function render() {
+            root.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8">
+                    <div>
+                        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                            <button id="analyze-btn" class="w-full sm:w-auto px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${state.isProcessing ? 'opacity-50 cursor-not-allowed' : ''}">${state.isProcessing ? 'Analyzing...' : 'Analyze Data'}</button>
+                            <button id="clear-btn" class="w-full sm:w-auto px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">Clear Values</button>
+                            <button id="toggle-grid-btn" class="w-full sm:w-auto px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">${state.isGridVisible ? 'Hide Grid' : 'Show Grid'}</button>
+                            <span class="text-gray-500 dark:text-gray-400">or</span>
+                            <input type="file" id="file-input" class="hidden" accept=".csv, .xlsx, .txt" />
+                            <button id="upload-btn" class="w-full sm:w-auto px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105">Upload File</button>
+                            ${state.summary ? `<button id="download-pdf-btn" class="w-full sm:w-auto px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg shadow-md transition-transform transform hover:scale-105 ${state.isDownloading ? 'opacity-50 cursor-not-allowed' : ''}">${state.isDownloading ? 'Downloading...' : '<svg xmlns="http://www.w3.org/2000/svg" class="inline-block mr-2 h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd" /></svg> Download PDF'}</button>` : ''}
+                        </div>
+                        <div class="mb-6 p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                            <label for="starting-balance-input" class="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Starting Wallet Balance</label>
+                            <input type="number" id="starting-balance-input" value="${state.startingBalance}" placeholder="Enter starting balance (e.g., 1000)" class="w-full px-3 py-2 text-gray-900 dark:text-white bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div id="spreadsheet-container" class="${state.isGridVisible ? '' : 'hidden'}"><div id="spreadsheet"></div></div>
+                    </div>
+                </div>
+                ${state.errorMessage ? `<div class="bg-red-500 text-white p-4 rounded-lg shadow-md mb-8"><p class="font-medium">${state.errorMessage}</p></div>` : ''}
+                ${state.summary ? `<div id="summary-container" class="space-y-8 animate-fadeInUp"></div>` : ''}
+            `;
+
+            if (state.summary) {
+                const summaryContainer = document.getElementById('summary-container');
+                if (summaryContainer) {
+                    summaryContainer.innerHTML = generateSummaryHtml(state.summary);
+                }
+            }
+            
+            attachEvents();
+            
+            if (!hot) {
+                initializeSpreadsheet();
+            }
+        }
+        
+        function initializeSpreadsheet() {
+            const container = document.getElementById('spreadsheet');
+            if (!container) return;
+            hot = new Handsontable(container, {
+                data: Array.from({ length: 50 }, () => Array(7).fill('')),
+                rowHeaders: true, colHeaders: fixedColumnNames, height: 'auto', width: '100%',
+                licenseKey: 'non-commercial-and-evaluation', stretchH: 'all', contextMenu: true,
+                manualColumnResize: true, manualRowResize: true, colWidths: 100,
+                wordWrap: false, autoWrapRow: true, autoWrapCol: true,
+            });
+        }
+        
+        function attachEvents() {
+            document.getElementById('analyze-btn').onclick = handleAnalyzeGrid;
+            document.getElementById('clear-btn').onclick = handleClearGrid;
+            document.getElementById('toggle-grid-btn').onclick = handleToggleGrid;
+            document.getElementById('upload-btn').onclick = () => document.getElementById('file-input').click();
+            document.getElementById('file-input').onchange = handleFileChange;
+            document.getElementById('starting-balance-input').oninput = (e) => { state.startingBalance = e.target.value; };
+
+            if (state.summary) {
+                document.getElementById('download-pdf-btn').onclick = handleDownloadPdf;
+                document.getElementById('view-by-symbol-btn')?.addEventListener('click', () => setAnalysisView('bySymbol'));
+                document.getElementById('view-total-summary-btn')?.addEventListener('click', () => setAnalysisView('byType'));
+            }
+        }
+        
+        function setAnalysisView(view) {
+            if (state.analysisView === view) return;
+            const container = document.getElementById('view-content-container');
+            if (container) {
+                container.classList.add('fading-out');
+                setTimeout(() => {
+                    state.analysisView = view;
+                    render();
+                }, 200);
+            } else {
+                 state.analysisView = view;
+                 render();
+            }
+        }
+        
+        function handleAnalyzeGrid() {
+            if (!hot) return;
+            const gridData = hot.getData();
+            processGridData(gridData);
+        }
+
+        function processGridData(gridRows) {
+            state.isProcessing = true;
+            state.errorMessage = '';
+            state.summary = null;
+            state.analysisView = 'bySymbol';
+            render();
+
+            try {
+                const typeIndex = fixedColumnNames.indexOf('value type');
+                const amountIndex = fixedColumnNames.indexOf('amount');
+                const symbolIndex = fixedColumnNames.indexOf('symbol');
+
+                const valueTypeMapping = {
+                    'COMMISSION': 'Trading fees', 
+                    'FUNDING_FEE': 'Funding fees',
+                    'REALIZED_PNL': 'Profit and losses',
+                };
+                
+                const symbolSummary = {};
+                const typeSummary = {};
+                let totalTransactions = 0;
+
+                gridRows.forEach(row => {
+                    if (row.every(cell => cell === null || cell === '')) return;
+                    const originalValueType = row[typeIndex]?.toUpperCase();
+                    const amount = parseFloat(row[amountIndex]);
+                    let symbol = row[symbolIndex];
+                    let mappedValueType;
+                    
+                    if (originalValueType === 'INSURANCE_CLEAR') {
+                        if (!symbol || symbol.trim() === '') {
+                            mappedValueType = 'Insurance Fund adjust';
+                            symbol = 'Non-Symbol Transactions';
+                        } else {
+                            mappedValueType = 'Liquidation fees';
+                        }
+                    } else {
+                        mappedValueType = valueTypeMapping[originalValueType] || originalValueType;
+                        if (NON_SYMBOL_TYPES.includes(originalValueType)) { symbol = 'Non-Symbol Transactions'; }
+                    }
+
+                    if (mappedValueType && !isNaN(amount) && symbol && symbol.trim() !== '') {
+                        totalTransactions++;
+                        if (!symbolSummary[symbol]) { symbolSummary[symbol] = { total: 0, breakdown: {}, tradingVolume: null }; }
+                        if (!symbolSummary[symbol].breakdown[mappedValueType]) { symbolSummary[symbol].breakdown[mappedValueType] = 0; }
+                        symbolSummary[symbol].breakdown[mappedValueType] += amount;
+                        symbolSummary[symbol].total += amount;
+
+                        if (!typeSummary[mappedValueType]) { typeSummary[mappedValueType] = { total: 0, count: 0 }; }
+                        typeSummary[mappedValueType].total += amount;
+                        typeSummary[mappedValueType].count++;
+                    }
+                });
+
+                if (totalTransactions === 0) throw new Error('No valid transactions found.');
+                
+                Object.keys(symbolSummary).forEach(symbol => {
+                    const data = symbolSummary[symbol];
+                    if (symbol !== 'Non-Symbol Transactions') {
+                        const tradingFees = data.breakdown['Trading fees'];
+                        if (tradingFees !== undefined && tradingFees !== 0) { data.tradingVolume = Math.abs(tradingFees) / 0.0005; }
+                    }
+                });
+                
+                // --- CORRECTED LOGIC IS HERE ---
+                const feesAndPnlSummary = {};
+                const transferSummary = {}; // This will only hold pure transfers now
+                for (const [type, data] of Object.entries(typeSummary)) {
+                    if (type.toUpperCase() === 'TRANSFER') { 
+                        transferSummary[type] = data; 
+                    } else { 
+                        feesAndPnlSummary[type] = data; 
+                    }
+                }
+                const feesAndPnlTotal = Object.values(feesAndPnlSummary).reduce((sum, data) => sum + data.total, 0);
+                const transfersTotal = Object.values(transferSummary).reduce((sum, data) => sum + data.total, 0);
+                
+                const startBalance = parseFloat(state.startingBalance) || 0;
+                // Ending balance now includes the total of PNL, fees, AND transfers/adjustments.
+                const endingBalance = startBalance + feesAndPnlTotal + transfersTotal;
+                // --- END OF CORRECTION ---
+                
+                state.summary = { 
+                    totalTransactions, 
+                    bySymbol: symbolSummary, 
+                    byType: { feesAndPnl: feesAndPnlSummary, transfers: transferSummary, feesAndPnlTotal, transfersTotal },
+                    startBalance,
+                    endingBalance
+                };
+                state.isProcessing = false;
+                state.isGridVisible = false;
+                render();
+            } catch (error) {
+                console.error('Data processing error:', error);
+                state.errorMessage = `An error occurred: ${error.message}`;
+                state.isProcessing = false;
+                render();
+            }
+        }
+
+        function generateSummaryHtml(summary) {
+            const bySymbolActive = state.analysisView === 'bySymbol';
+            const byTypeActive = state.analysisView === 'byType';
+
+            const toggleButtons = `<div class="flex justify-center items-center space-x-2 mb-6 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg"><button id="view-by-symbol-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${bySymbolActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">By Symbol</button><button id="view-total-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${byTypeActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">Total Summary</button></div>`;
+            
+            let contentHtml = '';
+            if (bySymbolActive) {
+                contentHtml = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">${Object.entries(summary.bySymbol).filter(([symbol,]) => symbol !== 'Non-Symbol Transactions').sort(([symA,], [symB,]) => symA.localeCompare(symB)).map(([symbol, data]) => `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">${symbol} Detailed Breakdown</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full overflow-hidden mb-4"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Value Type</th><th class="p-2 text-right font-medium">Amount</th></tr></thead><tbody>${Object.entries(data.breakdown).map(([type, amount]) => `<tr class="border-b border-gray-200 dark:border-gray-600 last:border-b-0"><td class="p-2">${type}</td><td class="p-2 text-right ${amount >= 0 ? 'text-green-500' : 'text-red-500'}">${amount.toFixed(8)}</td></tr>`).join('')}<tr class="bg-gray-200 dark:bg-gray-700/50 font-bold"><td class="p-2">Total</td><td class="p-2 text-right ${data.total >= 0 ? 'text-green-500' : 'text-red-500'}">${data.total.toFixed(8)}</td></tr></tbody></table></div><div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md w-full"><div class="text-sm text-gray-500 dark:text-gray-400">Approximate trading volume</div><div class="text-xl font-bold mt-1 text-gray-900 dark:text-gray-100">${data.tradingVolume !== null ? `$${data.tradingVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}</div></div></div>`).join('')}</div>`;
+            } else {
+                const { feesAndPnl, transfersTotal, feesAndPnlTotal } = summary.byType;
+                const feesAndPnlHtml = `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">Total Summary</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full overflow-hidden"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Description</th><th class="p-2 text-right font-medium">Amount</th></tr></thead><tbody>
+                    <tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Starting Wallet Balance</td><td class="p-2 text-right">${summary.startBalance.toFixed(8)}</td></tr>
+                    <tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Total Transfers & Adjustments</td><td class="p-2 text-right ${transfersTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${transfersTotal.toFixed(8)}</td></tr>
+                    ${Object.entries(feesAndPnl).sort(([typeA,],[typeB,])=>typeA.localeCompare(typeB)).map(([type, values]) => `<tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">${type}</td><td class="p-2 text-right ${values.total >= 0 ? 'text-green-500' : 'text-red-500'}">${values.total.toFixed(8)}</td></tr>`).join('')}
+                    <tr class="bg-gray-200 dark:bg-gray-700/50 font-bold"><td class="p-2">Total Fees & PNL</td><td class="p-2 text-right ${feesAndPnlTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${feesAndPnlTotal.toFixed(8)}</td></tr>
+                    <tr class="bg-blue-100 dark:bg-blue-900/50 font-bold"><td class="p-2">Ending Wallet Balance</td><td class="p-2 text-right text-blue-600 dark:text-blue-400">${summary.endingBalance.toFixed(8)}</td></tr>
+                </tbody></table></div></div>`;
+                contentHtml = `<div class="space-y-8">${feesAndPnlHtml}</div>`;
+            }
+
+            return `<div class="flex items-center p-4 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-md"><svg class="h-8 w-8 text-blue-500 mr-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg><div><div class="text-2xl font-bold text-gray-800 dark:text-white">${summary.totalTransactions}</div><div class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Transactions Analyzed</div></div></div>${toggleButtons}<div id="view-content-container" class="view-content">${contentHtml}</div>`;
+        }
+        
+        function handleClearGrid() { window.location.reload(); }
+        
+        function handleToggleGrid() {
+            state.isGridVisible = !state.isGridVisible;
+            render();
+            if (state.isGridVisible && hot) { setTimeout(() => hot.render(), 0); }
+        }
+        function handleFileChange(e) {
+            const file = e.target.files[0]; if (!file) return;
+            state.isProcessing = true; render(); const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = event.target.result; let parsedRows;
+                    if (file.name.endsWith('.xlsx')) {
+                        const workbook = XLSX.read(data, { type: 'binary' });
+                        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                        parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    } else { parsedRows = parseData(data); }
+                    const mappedData = mapSourceDataToTarget(parsedRows);
+                    if (hot) { hot.loadData(mappedData); }
+                } catch (error) { state.errorMessage = `Failed to process file: ${error.message}`; } 
+                finally { state.isProcessing = false; render(); }
+            };
+            reader.onerror = () => { state.errorMessage = 'Error reading file.'; state.isProcessing = false; render(); };
+            if (file.name.endsWith('.xlsx')) { reader.readAsBinaryString(file); } 
+            else { reader.readAsText(file); }
+        }
+        function parseData(rawData) {
+             if (!rawData || rawData.trim() === '') return [];
+            const lines = rawData.trim().split(/\r?\n/).filter(line => line.trim() !== '');
+            return lines.map(line => { let cells = line.split('\t'); if (cells.length === 1 && line.includes('  ')) { cells = line.split(/\s{2,}/).map(cell => cell.trim()); } return cells; });
+        }
+        function mapSourceDataToTarget(parsedRows) {
+            const targetData = []; if (!parsedRows || parsedRows.length === 0) return targetData;
+            let sourceIndexMap = {}; let sourceDataRows; const firstRow = parsedRows[0];
+            const hasHeaders = firstRow.length > 4 && isNaN(parseFloat(firstRow[4]));
+            if (hasHeaders) {
+                const sourceHeader = firstRow.map(h => h.trim().toLowerCase()); sourceDataRows = parsedRows.slice(1);
+                const aliasMap = { 'Transaction ID': ['transaction id'], 'FUID': ['future uid', 'fuid'], 'asset type': ['asset'], 'value type': ['type'], 'amount': ['delta', 'amount'], 'date': ['timestamp(utc)', 'update time(utc)', 'date'], 'symbol': ['symbol'] };
+                fixedColumnNames.forEach((targetColName, index) => {
+                    const aliases = aliasMap[targetColName.toLowerCase()];
+                    if (aliases) { for (const alias of aliases) { const foundIndex = sourceHeader.indexOf(alias); if (foundIndex !== -1) { sourceIndexMap[index] = foundIndex; break; } } }
+                });
+            } else { sourceDataRows = parsedRows; fixedColumnNames.forEach((name, index) => { sourceIndexMap[index] = index; }); }
+            sourceDataRows.forEach(sourceRow => {
+                const newRow = Array(fixedColumnNames.length).fill('');
+                fixedColumnNames.forEach((colName, targetIndex) => {
+                    const sourceIndex = sourceIndexMap[targetIndex]; if (sourceIndex !== undefined && sourceRow[sourceIndex] !== undefined) { newRow[targetIndex] = sourceRow[sourceIndex]; }
+                });
+                targetData.push(newRow);
+            });
+            return targetData;
+        }
+        async function handleDownloadPdf() {
+             state.isDownloading = true;
+            render();
+            const element = document.getElementById('summary-container');
+            if (!element) {
+                state.isDownloading = false;
+                state.errorMessage = 'Could not find summary element to download.';
+                render();
+                return;
+            }
+            try {
+                const canvas = await html2canvas(element, { scale: 2, logging: false });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 210;
+                const pageHeight = 297;
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+                pdf.save('TransactionSummary.pdf');
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                state.errorMessage = `Failed to generate PDF: ${error.message}`;
+            } finally {
+                state.isDownloading = false;
+                render();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', render);
+    
+
+							</script>
+                        </body>
+                        </html>
+                    
