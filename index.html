@@ -105,6 +105,7 @@
         const NON_SYMBOL_TYPES = ['TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD', 'COIN_SWAP_DEPOSIT', 'COIN_SWAP_WITHDRAW'];
         
         let hot;
+        let dataJustPasted = false;
 
         function render() {
             root.innerHTML = `
@@ -153,6 +154,9 @@
                 licenseKey: 'non-commercial-and-evaluation', stretchH: 'all', contextMenu: true,
                 manualColumnResize: true, manualRowResize: true, colWidths: 100,
                 wordWrap: false, autoWrapRow: true, autoWrapCol: true,
+                afterPaste: function(data, coords) {
+                    dataJustPasted = true;
+                }
             });
         }
         
@@ -168,6 +172,7 @@
                 document.getElementById('download-pdf-btn').onclick = handleDownloadPdf;
                 document.getElementById('view-by-symbol-btn')?.addEventListener('click', () => setAnalysisView('bySymbol'));
                 document.getElementById('view-total-summary-btn')?.addEventListener('click', () => setAnalysisView('byType'));
+                document.getElementById('copy-summary-btn')?.addEventListener('click', handleCopySummary);
             }
         }
         
@@ -185,9 +190,91 @@
                  render();
             }
         }
+
+        function fallbackCopyTextToClipboard(text, btn) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (btn) btn.textContent = 'Copied!';
+            } catch (err) {
+                console.error('Fallback: Unable to copy', err);
+                if (btn) btn.textContent = 'Copy Failed!';
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // --- CHANGE IS HERE: Updated handleCopySummary with custom sentences ---
+        async function handleCopySummary() {
+            if (!state.summary) return;
+
+            const bySymbolGreeting = 'Thank you for your patience dear valued user, here is a breakdown of your position(s) with their respective Fees and PNL. Thank you';
+            const totalSummaryGreeting = 'Thank you for your patience dear valued user. Here is a breakdown of your transactions in more details.';
+            let clipboardContent = '';
+            
+            if (state.analysisView === 'bySymbol') {
+                const symbolsToCopy = Object.keys(state.summary.bySymbol)
+                    .filter(s => s !== 'Non-Symbol Transactions')
+                    .sort();
+                const summaryBlocks = [];
+                for (const symbol of symbolsToCopy) {
+                    const breakdown = state.summary.bySymbol[symbol].breakdown;
+                    const symbolBlock = [
+                        symbol,
+                        `Trading Fees: ${breakdown['Trading Fees'] || 0}`,
+                        `Profit and Loss: ${breakdown['Profit and Loss'] || 0}`,
+                        `Funding Fees: ${breakdown['Funding Fees'] || 0}`,
+                        `Liquidation Fees: ${breakdown['Liquidation Fees'] || 0}`
+                    ].join('\n');
+                    summaryBlocks.push(symbolBlock);
+                }
+                clipboardContent = bySymbolGreeting + '\n\n' + summaryBlocks.join('\n\n');
+            } else { // 'byType' view (Total Summary)
+                const { feesAndPnl, transfersTotal, feesAndPnlTotal } = state.summary.byType;
+                const { startBalance, endingBalance, isWalletBalanceMode } = state.summary;
+                const rows = [['Description', 'Amount']];
+
+                if (isWalletBalanceMode) {
+                    rows.push(['Starting Wallet Balance', startBalance.toFixed(8)]);
+                    if (transfersTotal !== 0) {
+                        rows.push(['Total Transfers', transfersTotal.toFixed(8)]);
+                    }
+                }
+                Object.entries(feesAndPnl).sort(([typeA,],[typeB,])=>typeA.localeCompare(typeB)).forEach(([type, values]) => {
+                    rows.push([type, values.total.toFixed(8)]);
+                });
+                rows.push(['Total Fees & PNL', feesAndPnlTotal.toFixed(8)]);
+                if (isWalletBalanceMode) {
+                    rows.push(['Ending Wallet Balance', endingBalance.toFixed(8)]);
+                }
+                const tableContent = rows.map(row => row.join('\t')).join('\n');
+                clipboardContent = totalSummaryGreeting + '\n\n' + tableContent;
+            }
+
+            const btn = document.getElementById('copy-summary-btn');
+            if (!navigator.clipboard) {
+                fallbackCopyTextToClipboard(clipboardContent, btn);
+            } else {
+                try {
+                    await navigator.clipboard.writeText(clipboardContent);
+                    if (btn) btn.textContent = 'Copied!';
+                } catch (err) {
+                    fallbackCopyTextToClipboard(clipboardContent, btn);
+                }
+            }
+            setTimeout(() => { if (btn) btn.textContent = 'Copy Summary'; }, 2000);
+        }
+        // --- END OF CHANGE ---
         
         function handleAnalyzeGrid() {
             if (!hot) return;
+            dataJustPasted = false;
             const gridData = hot.getData();
             processGridData(gridData);
         }
@@ -205,9 +292,9 @@
                 const symbolIndex = fixedColumnNames.indexOf('symbol');
 
                 const valueTypeMapping = {
-                    'COMMISSION': 'Trading fees', 
-                    'FUNDING_FEE': 'Funding fees',
-                    'REALIZED_PNL': 'Profit and losses',
+                    'COMMISSION': 'Trading Fees', 
+                    'FUNDING_FEE': 'Funding Fees',
+                    'REALIZED_PNL': 'Profit and Loss',
                 };
                 
                 const symbolSummary = {};
@@ -223,10 +310,10 @@
                     
                     if (originalValueType === 'INSURANCE_CLEAR') {
                         if (!symbol || symbol.trim() === '') {
-                            mappedValueType = 'Insurance Fund adjust';
+                            mappedValueType = 'Insurance Fund Adjust';
                             symbol = 'Non-Symbol Transactions';
                         } else {
-                            mappedValueType = 'Liquidation fees';
+                            mappedValueType = 'Liquidation Fees';
                         }
                     } else {
                         mappedValueType = valueTypeMapping[originalValueType] || originalValueType;
@@ -251,7 +338,7 @@
                 Object.keys(symbolSummary).forEach(symbol => {
                     const data = symbolSummary[symbol];
                     if (symbol !== 'Non-Symbol Transactions') {
-                        const tradingFees = data.breakdown['Trading fees'];
+                        const tradingFees = data.breakdown['Trading Fees'];
                         if (tradingFees !== undefined && tradingFees !== 0) { data.tradingVolume = Math.abs(tradingFees) / 0.0005; }
                     }
                 });
@@ -296,7 +383,7 @@
             const bySymbolActive = state.analysisView === 'bySymbol';
             const byTypeActive = state.analysisView === 'byType';
 
-            const toggleButtons = `<div class="flex justify-center items-center space-x-2 mb-6 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg"><button id="view-by-symbol-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${bySymbolActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">By Symbol</button><button id="view-total-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${byTypeActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">Total Summary</button></div>`;
+            const toggleButtons = `<div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2 mb-6"><div class="flex w-full sm:w-auto bg-gray-100 dark:bg-gray-700 p-1 rounded-lg"><button id="view-by-symbol-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${bySymbolActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">By Symbol</button><button id="view-total-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${byTypeActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">Total Summary</button></div><button id="copy-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors w-full sm:w-auto">Copy Summary</button></div>`;
             
             let contentHtml = '';
             if (bySymbolActive) {
@@ -304,7 +391,6 @@
             } else {
                 const { feesAndPnl, transfers, feesAndPnlTotal, transfersTotal } = summary.byType;
                 const isWalletMode = summary.isWalletBalanceMode;
-
                 const feesAndPnlHtml = `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">Total Summary</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full overflow-hidden"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Description</th><th class="p-2 text-right font-medium">Amount</th></tr></thead><tbody>
                     ${isWalletMode ? `<tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Starting Wallet Balance</td><td class="p-2 text-right">${summary.startBalance.toFixed(8)}</td></tr>` : ''}
                     ${isWalletMode && transfersTotal !== 0 ? `<tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Total Transfers</td><td class="p-2 text-right ${transfersTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${transfersTotal.toFixed(8)}</td></tr>` : ''}
@@ -312,9 +398,7 @@
                     <tr class="bg-gray-200 dark:bg-gray-700/50 font-bold"><td class="p-2">Total Fees & PNL</td><td class="p-2 text-right ${feesAndPnlTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${feesAndPnlTotal.toFixed(8)}</td></tr>
                     ${isWalletMode ? `<tr class="bg-blue-100 dark:bg-blue-900/50 font-bold"><td class="p-2">Ending Wallet Balance</td><td class="p-2 text-right text-blue-600 dark:text-blue-400">${summary.endingBalance.toFixed(8)}</td></tr>` : ''}
                 </tbody></table></div></div>`;
-                
                 const transfersHtml = Object.keys(transfers).length > 0 && !isWalletMode ? `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">Transfers Summary</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full max-w-md overflow-hidden"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Type</th><th class="p-2 text-right font-medium">Total Amount</th></tr></thead><tbody>${Object.entries(transfers).sort(([typeA,],[typeB,])=>typeA.localeCompare(typeB)).map(([type, values]) => `<tr class="border-b border-gray-200 dark:border-gray-600 last:border-b-0"><td class="p-2">${type}</td><td class="p-2 text-right ${values.total >= 0 ? 'text-green-500' : 'text-red-500'}">${values.total.toFixed(8)}</td></tr>`).join('')}</tbody></table></div></div>` : '';
-
                 contentHtml = `<div class="space-y-8">${feesAndPnlHtml}${transfersHtml}</div>`;
             }
 
@@ -340,7 +424,7 @@
                         parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     } else { parsedRows = parseData(data); }
                     const mappedData = mapSourceDataToTarget(parsedRows);
-                    if (hot) { hot.loadData(mappedData); }
+                    if (hot) { hot.loadData(mappedData); handleAnalyzeGrid(); }
                 } catch (error) { state.errorMessage = `Failed to process file: ${error.message}`; } 
                 finally { state.isProcessing = false; render(); }
             };
@@ -410,7 +494,12 @@
                 render();
             }
         }
-
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && dataJustPasted) {
+                event.preventDefault();
+                handleAnalyzeGrid();
+            }
+        });
         document.addEventListener('DOMContentLoaded', render);
     </script>
 </body>
@@ -436,6 +525,7 @@
         const NON_SYMBOL_TYPES = ['TRANSFER', 'STRATEGY_UMFUTURES_TRANSFER', 'BFUSD_REWARD', 'COIN_SWAP_DEPOSIT', 'COIN_SWAP_WITHDRAW'];
         
         let hot;
+        let dataJustPasted = false;
 
         function render() {
             root.innerHTML = `
@@ -484,6 +574,9 @@
                 licenseKey: 'non-commercial-and-evaluation', stretchH: 'all', contextMenu: true,
                 manualColumnResize: true, manualRowResize: true, colWidths: 100,
                 wordWrap: false, autoWrapRow: true, autoWrapCol: true,
+                afterPaste: function(data, coords) {
+                    dataJustPasted = true;
+                }
             });
         }
         
@@ -499,6 +592,7 @@
                 document.getElementById('download-pdf-btn').onclick = handleDownloadPdf;
                 document.getElementById('view-by-symbol-btn')?.addEventListener('click', () => setAnalysisView('bySymbol'));
                 document.getElementById('view-total-summary-btn')?.addEventListener('click', () => setAnalysisView('byType'));
+                document.getElementById('copy-summary-btn')?.addEventListener('click', handleCopySummary);
             }
         }
         
@@ -516,9 +610,91 @@
                  render();
             }
         }
+
+        function fallbackCopyTextToClipboard(text, btn) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                if (btn) btn.textContent = 'Copied!';
+            } catch (err) {
+                console.error('Fallback: Unable to copy', err);
+                if (btn) btn.textContent = 'Copy Failed!';
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // --- CHANGE IS HERE: Updated handleCopySummary with custom sentences ---
+        async function handleCopySummary() {
+            if (!state.summary) return;
+
+            const bySymbolGreeting = 'Thank you for your patience dear valued user, here is a breakdown of your position(s) with their respective Fees and PNL. Thank you';
+            const totalSummaryGreeting = 'Thank you for your patience dear valued user. Here is a breakdown of your transactions in more details.';
+            let clipboardContent = '';
+            
+            if (state.analysisView === 'bySymbol') {
+                const symbolsToCopy = Object.keys(state.summary.bySymbol)
+                    .filter(s => s !== 'Non-Symbol Transactions')
+                    .sort();
+                const summaryBlocks = [];
+                for (const symbol of symbolsToCopy) {
+                    const breakdown = state.summary.bySymbol[symbol].breakdown;
+                    const symbolBlock = [
+                        symbol,
+                        `Trading Fees: ${breakdown['Trading Fees'] || 0}`,
+                        `Profit and Loss: ${breakdown['Profit and Loss'] || 0}`,
+                        `Funding Fees: ${breakdown['Funding Fees'] || 0}`,
+                        `Liquidation Fees: ${breakdown['Liquidation Fees'] || 0}`
+                    ].join('\n');
+                    summaryBlocks.push(symbolBlock);
+                }
+                clipboardContent = bySymbolGreeting + '\n\n' + summaryBlocks.join('\n\n');
+            } else { // 'byType' view (Total Summary)
+                const { feesAndPnl, transfersTotal, feesAndPnlTotal } = state.summary.byType;
+                const { startBalance, endingBalance, isWalletBalanceMode } = state.summary;
+                const rows = [['Description', 'Amount']];
+
+                if (isWalletBalanceMode) {
+                    rows.push(['Starting Wallet Balance', startBalance.toFixed(8)]);
+                    if (transfersTotal !== 0) {
+                        rows.push(['Total Transfers', transfersTotal.toFixed(8)]);
+                    }
+                }
+                Object.entries(feesAndPnl).sort(([typeA,],[typeB,])=>typeA.localeCompare(typeB)).forEach(([type, values]) => {
+                    rows.push([type, values.total.toFixed(8)]);
+                });
+                rows.push(['Total Fees & PNL', feesAndPnlTotal.toFixed(8)]);
+                if (isWalletBalanceMode) {
+                    rows.push(['Ending Wallet Balance', endingBalance.toFixed(8)]);
+                }
+                const tableContent = rows.map(row => row.join('\t')).join('\n');
+                clipboardContent = totalSummaryGreeting + '\n\n' + tableContent;
+            }
+
+            const btn = document.getElementById('copy-summary-btn');
+            if (!navigator.clipboard) {
+                fallbackCopyTextToClipboard(clipboardContent, btn);
+            } else {
+                try {
+                    await navigator.clipboard.writeText(clipboardContent);
+                    if (btn) btn.textContent = 'Copied!';
+                } catch (err) {
+                    fallbackCopyTextToClipboard(clipboardContent, btn);
+                }
+            }
+            setTimeout(() => { if (btn) btn.textContent = 'Copy Summary'; }, 2000);
+        }
+        // --- END OF CHANGE ---
         
         function handleAnalyzeGrid() {
             if (!hot) return;
+            dataJustPasted = false;
             const gridData = hot.getData();
             processGridData(gridData);
         }
@@ -536,9 +712,9 @@
                 const symbolIndex = fixedColumnNames.indexOf('symbol');
 
                 const valueTypeMapping = {
-                    'COMMISSION': 'Trading fees', 
-                    'FUNDING_FEE': 'Funding fees',
-                    'REALIZED_PNL': 'Profit and losses',
+                    'COMMISSION': 'Trading Fees', 
+                    'FUNDING_FEE': 'Funding Fees',
+                    'REALIZED_PNL': 'Profit and Loss',
                 };
                 
                 const symbolSummary = {};
@@ -554,10 +730,10 @@
                     
                     if (originalValueType === 'INSURANCE_CLEAR') {
                         if (!symbol || symbol.trim() === '') {
-                            mappedValueType = 'Insurance Fund adjust';
+                            mappedValueType = 'Insurance Fund Adjust';
                             symbol = 'Non-Symbol Transactions';
                         } else {
-                            mappedValueType = 'Liquidation fees';
+                            mappedValueType = 'Liquidation Fees';
                         }
                     } else {
                         mappedValueType = valueTypeMapping[originalValueType] || originalValueType;
@@ -582,7 +758,7 @@
                 Object.keys(symbolSummary).forEach(symbol => {
                     const data = symbolSummary[symbol];
                     if (symbol !== 'Non-Symbol Transactions') {
-                        const tradingFees = data.breakdown['Trading fees'];
+                        const tradingFees = data.breakdown['Trading Fees'];
                         if (tradingFees !== undefined && tradingFees !== 0) { data.tradingVolume = Math.abs(tradingFees) / 0.0005; }
                     }
                 });
@@ -627,7 +803,7 @@
             const bySymbolActive = state.analysisView === 'bySymbol';
             const byTypeActive = state.analysisView === 'byType';
 
-            const toggleButtons = `<div class="flex justify-center items-center space-x-2 mb-6 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg"><button id="view-by-symbol-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${bySymbolActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">By Symbol</button><button id="view-total-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${byTypeActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">Total Summary</button></div>`;
+            const toggleButtons = `<div class="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-2 mb-6"><div class="flex w-full sm:w-auto bg-gray-100 dark:bg-gray-700 p-1 rounded-lg"><button id="view-by-symbol-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${bySymbolActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">By Symbol</button><button id="view-total-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-md w-full transition-colors ${byTypeActive ? 'bg-blue-500 text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}">Total Summary</button></div><button id="copy-summary-btn" class="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors w-full sm:w-auto">Copy Summary</button></div>`;
             
             let contentHtml = '';
             if (bySymbolActive) {
@@ -635,7 +811,6 @@
             } else {
                 const { feesAndPnl, transfers, feesAndPnlTotal, transfersTotal } = summary.byType;
                 const isWalletMode = summary.isWalletBalanceMode;
-
                 const feesAndPnlHtml = `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">Total Summary</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full overflow-hidden"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Description</th><th class="p-2 text-right font-medium">Amount</th></tr></thead><tbody>
                     ${isWalletMode ? `<tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Starting Wallet Balance</td><td class="p-2 text-right">${summary.startBalance.toFixed(8)}</td></tr>` : ''}
                     ${isWalletMode && transfersTotal !== 0 ? `<tr class="border-b border-gray-200 dark:border-gray-600"><td class="p-2">Total Transfers</td><td class="p-2 text-right ${transfersTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${transfersTotal.toFixed(8)}</td></tr>` : ''}
@@ -643,9 +818,7 @@
                     <tr class="bg-gray-200 dark:bg-gray-700/50 font-bold"><td class="p-2">Total Fees & PNL</td><td class="p-2 text-right ${feesAndPnlTotal >= 0 ? 'text-green-500' : 'text-red-500'}">${feesAndPnlTotal.toFixed(8)}</td></tr>
                     ${isWalletMode ? `<tr class="bg-blue-100 dark:bg-blue-900/50 font-bold"><td class="p-2">Ending Wallet Balance</td><td class="p-2 text-right text-blue-600 dark:text-blue-400">${summary.endingBalance.toFixed(8)}</td></tr>` : ''}
                 </tbody></table></div></div>`;
-                
                 const transfersHtml = Object.keys(transfers).length > 0 && !isWalletMode ? `<div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"><h3 class="text-lg font-semibold mb-4">Transfers Summary</h3><div class="border border-gray-200 dark:border-gray-700 rounded-lg w-full max-w-md overflow-hidden"><table class="w-full table-auto text-sm"><thead><tr class="bg-gray-100 dark:bg-gray-700"><th class="p-2 text-left font-medium">Type</th><th class="p-2 text-right font-medium">Total Amount</th></tr></thead><tbody>${Object.entries(transfers).sort(([typeA,],[typeB,])=>typeA.localeCompare(typeB)).map(([type, values]) => `<tr class="border-b border-gray-200 dark:border-gray-600 last:border-b-0"><td class="p-2">${type}</td><td class="p-2 text-right ${values.total >= 0 ? 'text-green-500' : 'text-red-500'}">${values.total.toFixed(8)}</td></tr>`).join('')}</tbody></table></div></div>` : '';
-
                 contentHtml = `<div class="space-y-8">${feesAndPnlHtml}${transfersHtml}</div>`;
             }
 
@@ -671,7 +844,7 @@
                         parsedRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     } else { parsedRows = parseData(data); }
                     const mappedData = mapSourceDataToTarget(parsedRows);
-                    if (hot) { hot.loadData(mappedData); }
+                    if (hot) { hot.loadData(mappedData); handleAnalyzeGrid(); }
                 } catch (error) { state.errorMessage = `Failed to process file: ${error.message}`; } 
                 finally { state.isProcessing = false; render(); }
             };
@@ -741,7 +914,12 @@
                 render();
             }
         }
-
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && dataJustPasted) {
+                event.preventDefault();
+                handleAnalyzeGrid();
+            }
+        });
         document.addEventListener('DOMContentLoaded', render);
     
 
